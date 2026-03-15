@@ -306,8 +306,14 @@ function calcUnit(item) {
 function estimateShipping(item) {
   const m = (item.mallName||"").toLowerCase();
   const t = strip(item.title||"").toLowerCase();
-  if (m.includes("쿠팡") || t.includes("로켓") || t.includes("무료배송")) return "free";
-  if (Number(item.lprice) >= 30000) return "free";
+  // 배송비 직접 명시된 경우
+  if (item.deliveryFee !== undefined && item.deliveryFee === "0") return "free";
+  if (item.deliveryFee !== undefined && Number(item.deliveryFee) === 0) return "free";
+  // 쿠팡/로켓/무료배송 키워드
+  if (m.includes("쿠팡") || t.includes("로켓배송") || t.includes("무료배송") || t.includes("배송비무료") || t.includes("배송비 무료")) return "free";
+  // 네이버 mall 도메인
+  if (m.includes("네이버") && Number(item.lprice) >= 20000) return "free";
+  if (Number(item.lprice) >= 50000) return "free";
   return "paid";
 }
 
@@ -443,7 +449,8 @@ function buildFilterTabs() {
   const tabs = document.getElementById("filterTabs");
   let html = `
     <button class="ftab active" onclick="applyFilter('popular')" id="ftab-popular">🔥 판매인기순</button>
-    <button class="ftab" onclick="applyFilter('price')" id="ftab-price">💰 최저가 ↑</button>
+    <button class="ftab" onclick="applyFilter('price_asc')" id="ftab-price_asc">💰 최저가</button>
+    <button class="ftab" onclick="applyFilter('price_desc')" id="ftab-price_desc">💸 최고가</button>
     <button class="ftab" onclick="applyFilter('free')" id="ftab-free">🚚 무료배송</button>`;
 
   if (currentCategory === "food") {
@@ -451,8 +458,8 @@ function buildFilterTabs() {
   }
 
   html += `
-    <button class="ftab" onclick="applyFilter('naver')" id="ftab-naver">🟢 네이버</button>
-    <button class="ftab" onclick="applyFilter('coupang')" id="ftab-coupang">🟡 쿠팡</button>`;
+    <button class="ftab" onclick="applyFilter('coupang')" id="ftab-coupang">🟡 쿠팡</button>
+    <button class="ftab" onclick="applyFilter('naver')" id="ftab-naver">🟢 네이버</button>`;
 
   tabs.innerHTML = html;
   document.getElementById("filterWrap").style.display = "block";
@@ -611,9 +618,11 @@ function getFiltered(filter) {
   if (filter === "popular") {
     return [...coupangRaw, ...naverRaw];
   }
-  if (filter === "price") {
-    if (priceOrder === "asc") return items.sort((a,b)=>Number(a.lprice)-Number(b.lprice));
-    else return items.sort((a,b)=>Number(b.lprice)-Number(a.lprice));
+  if (filter === "price" || filter === "price_asc") {
+    return [...items].sort((a,b)=>Number(a.lprice)-Number(b.lprice));
+  }
+  if (filter === "price_desc") {
+    return [...items].sort((a,b)=>Number(b.lprice)-Number(a.lprice));
   }
   if (filter === "free") return items.filter(i=>i.shipping==="free").sort((a,b)=>Number(a.lprice)-Number(b.lprice));
   if (filter === "unit") return items.filter(i=>i.unitInfo).sort((a,b)=>a.unitInfo.unitPrice-b.unitInfo.unitPrice);
@@ -653,11 +662,11 @@ async function applyFilter(filter) {
   if(priceFt && filter !== "price") priceFt.textContent = "💰 최저가 ↑";
 
   // 탭별 API 재호출
-  if (filter === "price" || filter === "value") {
-    // 최저가/단가 탭: sort=asc로 새 데이터
+  if (filter === "price_asc" || filter === "value") {
     await fetchAndUpdate("asc");
+  } else if (filter === "price_desc") {
+    await fetchAndUpdate("dsc");
   } else if (filter === "popular") {
-    // 인기순: sort=sim으로 새 데이터
     await fetchAndUpdate("sim");
   }
 
