@@ -399,7 +399,7 @@ async function doSearch() {
     coupangRaw = naverRaw.slice(0,8).map(item=>{
       const productTitle = strip(item.title).replace(/<[^>]*>/g,"").substring(0,30);
       // 무조건 내 추적링크로만 생성 - 네이버 원본 링크 절대 사용 안 함
-      const itemLink = `https://link.coupang.com/a/${afId}?q=${encodeURIComponent(productTitle)}`;
+      const itemLink = `https://link.coupang.com/a/${AF_ID}?q=${encodeURIComponent(productTitle)}`;
       return {
         ...item,
         platform:"coupang",
