@@ -275,7 +275,9 @@ function smartFilter(items, query, category) {
     });
   }
 
-  return result.length >= 3 ? result : noSample;
+  // 최후 fallback도 체험/샘플 절대 포함 안 함
+  if (result.length === 0) return noSample;
+  return result;
 }
 
 function calcUnit(item) {
@@ -421,7 +423,6 @@ function buildFilterTabs() {
   }
 
   html += `
-    <button class="ftab" onclick="applyFilter('sample')" id="ftab-sample">🎁 체험/샘플</button>
     <button class="ftab" onclick="applyFilter('naver')" id="ftab-naver">🟢 네이버</button>
     <button class="ftab" onclick="applyFilter('coupang')" id="ftab-coupang">🟡 쿠팡</button>`;
 
@@ -582,20 +583,27 @@ function applyFilter(filter) {
     if(ft) ft.textContent = priceOrder === "asc" ? "💰 최저가 ↑" : "💰 최고가 ↓";
     displayedCount=0;
     renderList("price", true);
+    // 상품 목록으로 스크롤
+    setTimeout(() => {
+      document.getElementById("productList").scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
     return;
   }
   currentFilter=filter;
-  if(filter === "price") { priceOrder = "asc"; } // 새로 클릭하면 최저가부터
+  if(filter === "price") { priceOrder = "asc"; }
   document.querySelectorAll(".ftab").forEach(t=>t.classList.remove("active"));
   const ft=document.getElementById("ftab-"+filter);
   if(ft) ft.classList.add("active");
-  // 가격순 탭 아이콘 리셋
   const priceFt = document.getElementById("ftab-price");
   if(priceFt && filter !== "price") priceFt.textContent = "💰 최저가 ↑";
   const badge = document.getElementById("lowestBadge");
   if(badge) badge.style.display = (filter==="price"||filter==="unit") ? "inline-block" : "none";
   displayedCount=0;
   renderList(filter,true);
+  // 상품 목록으로 스크롤
+  setTimeout(() => {
+    document.getElementById("productList").scrollIntoView({ behavior: "smooth", block: "start" });
+  }, 100);
 }
 
 function renderList(filter, reset) {
