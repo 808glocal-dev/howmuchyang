@@ -246,9 +246,13 @@ const KW_ALIAS = {
 };
 
 function extractCoreKw(query) {
-  const cleaned = query.toLowerCase().replace(/[^\w\s가-힣]/g,' ').replace(/\s+/g,' ').trim();
-  const words = cleaned.split(' ').filter(w => w.length >= 2 && !STOP_WORDS.some(s => s.toLowerCase() === w));
-  // 동의어 확장
+  // 영어+한글 혼용 분리: "anf고양이캔" → ["anf", "고양이캔"]
+  const separated = query.toLowerCase()
+    .replace(/([a-z])([가-힣])/g, '$1 $2')
+    .replace(/([가-힣])([a-z])/g, '$1 $2')
+    .replace(/[^\w\s가-힣]/g,' ')
+    .replace(/\s+/g,' ').trim();
+  const words = separated.split(' ').filter(w => w.length >= 1 && !STOP_WORDS.some(s => s.toLowerCase() === w));
   const expanded = [];
   words.forEach(w => {
     if (KW_ALIAS[w]) expanded.push(...KW_ALIAS[w]);
@@ -671,6 +675,10 @@ function renderAI() {
 
     const card=document.createElement("div");
     card.className=`ai-top-card ${cardCls[i]}`;
+    card.dataset.title = strip(item.title).replace(/<[^>]*>/g,"").substring(0,30);
+    card.dataset.platform = item.platform || "naver";
+    card.dataset.mall = (item.mallName||"").toLowerCase();
+    card.dataset.link = item.link||item.productLink||"";
     card.innerHTML=`
       <div class="ai-top-left">
         <div class="rank-badge ${ranks[i]}">${i+1}</div>
@@ -868,19 +876,24 @@ function loadMore(){ renderList(currentFilter,false); }
 
 const AF_ID = "d4YZ7m";
 
-// 상품 URL 생성 - 쿠팡이면 내 추적링크, 네이버면 원본 링크
+// 상품 URL 생성
 function getProductUrl(card) {
   const title = card.dataset.title || "";
   const platform = card.dataset.platform || "";
   const mall = card.dataset.mall || "";
   const link = card.dataset.link || "";
   const q = encodeURIComponent(title);
-  // 쿠팡이면 무조건 내 추적링크
-  if (platform === "coupang" || mall.includes("쿠팡") || mall.includes("coupang") ||
-      link.includes("lptag=") || link.includes("coupang.com") || link.includes("coupa.ng")) {
+
+  // 쿠팡 판매자 or 링크에 쿠팡/lptag 흔적 → 내 추적링크
+  if (platform === "coupang" ||
+      mall.includes("쿠팡") || mall.includes("coupang") ||
+      link.includes("lptag=") ||
+      link.includes("coupang.com") ||
+      link.includes("coupa.ng")) {
     return `https://link.coupang.com/a/${AF_ID}?q=${q}`;
   }
-  // 네이버면 원본 링크
+
+  // 네이버 원본 링크
   return link;
 }
 
