@@ -39,7 +39,7 @@
     .ai-top-left{display:flex;align-items:center;gap:8px;min-width:0;}
     .rank-badge{width:22px;height:22px;border-radius:50%;font-size:11px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
     .rank-badge.r1{background:var(--primary);color:white;}
-    .rank-badge.r2,.rank-badge.r3{background:#f0f0f0;color:var(--sub);}
+    .rank-badge.r2,.rank-badge.r3,.rank-badge.r4,.rank-badge.r5,.rank-badge.r6,.rank-badge.r7,.rank-badge.r8,.rank-badge.r9,.rank-badge.r10{background:#f0f0f0;color:var(--sub);}
     .ai-info{min-width:0;}
     .ai-name{font-size:12px;font-weight:700;color:var(--text);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:190px;}
     .ai-desc{font-size:10px;color:var(--sub);margin-top:1px;}
@@ -621,15 +621,15 @@ function renderAI() {
     if(seen.has(k)) return false;
     seen.add(k); return true;
   }).slice(0,3);
-  while(candidates.length<3){
+  while(candidates.length<10){
     const extra = naverRaw.find(i=>!candidates.includes(i));
     if(extra) candidates.push(extra); else break;
   }
 
   const container = document.getElementById("aiTop3");
   container.innerHTML="";
-  const ranks=["r1","r2","r3"];
-  const cardCls=["rank1","rank2","rank3"];
+  const ranks=["r1","r2","r3","r4","r5","r6","r7","r8","r9","r10"];
+  const cardCls=["rank1","rank2","rank3","rank4","rank5","rank6","rank7","rank8","rank9","rank10"];
 
   candidates.forEach((item,i)=>{
     const price=Number(item.lprice);
@@ -683,8 +683,41 @@ function hardFilter(items) {
 }
 
 function getFiltered(filter) {
-  if (filter === "naver") return hardFilter([...naverRaw]);
-  if (filter === "coupang") return hardFilter([...coupangRaw]);
+  const naver = [...naverRaw];
+  const coupang = [...coupangRaw];
+  const all = [...coupangRaw, ...naverRaw];
+
+  switch(filter) {
+    case "popular":
+      return all; // 인기순 그대로
+
+    case "price_asc":
+      return [...all].sort((a,b) => Number(a.lprice) - Number(b.lprice));
+
+    case "price_desc":
+      return [...all].sort((a,b) => Number(b.lprice) - Number(a.lprice));
+
+    case "free":
+      return all.filter(i => i.shipping === "free")
+                .sort((a,b) => Number(a.lprice) - Number(b.lprice));
+
+    case "coupang":
+      return coupang.sort((a,b) => Number(a.lprice) - Number(b.lprice));
+
+    case "naver":
+      return naver; // 네이버 인기순 그대로
+
+    case "value":
+      const withUnit = all.filter(i=>i.unitInfo).sort((a,b)=>a.unitInfo.unitPrice-b.unitInfo.unitPrice);
+      const noUnit = all.filter(i=>!i.unitInfo).sort((a,b)=>Number(a.lprice)-Number(b.lprice));
+      return [...withUnit, ...noUnit];
+
+    default:
+      return all;
+  }
+}
+
+
 
   let items = hardFilter([...coupangRaw, ...naverRaw]);
   // 브랜드 필터
@@ -714,7 +747,7 @@ function getFiltered(filter) {
   return items;
 }
 
-async function applyFilter(filter) {
+function applyFilter(filter) {
   // 가격순 재클릭 시 최저/최고 토글
   if (filter === "price" && currentFilter === "price") {
     priceOrder = priceOrder === "asc" ? "desc" : "asc";
@@ -738,14 +771,7 @@ async function applyFilter(filter) {
   const priceFt = document.getElementById("ftab-price");
   if(priceFt && filter !== "price") priceFt.textContent = "💰 최저가 ↑";
 
-  // 탭별 API 재호출
-  if (filter === "price_asc" || filter === "value") {
-    await fetchAndUpdate("asc");
-  } else if (filter === "price_desc") {
-    await fetchAndUpdate("dsc");
-  } else if (filter === "popular" || filter === "free" || filter === "coupang" || filter === "naver") {
-    await fetchAndUpdate("sim");
-  }
+  // API 재호출 없음 - 인기순 데이터를 탭별로 정렬만 변경
 
   displayedCount=0;
   renderList(filter, true);
