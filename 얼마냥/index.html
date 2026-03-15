@@ -208,6 +208,8 @@
 let allItems = [];       // 원본 (필터링 완료)
 let naverRaw = [];       // 네이버 원본
 let coupangRaw = [];     // 쿠팡 원본
+let sampleRaw = [];      // 체험/샘플 상품
+let priceOrder = "asc";  // 가격순 방향
 let displayedCount = 0;
 const PAGE_SIZE = 15;
 let currentFilter = "popular";
@@ -368,6 +370,20 @@ async function doSearch() {
     // 스마트 필터링
     const filtered = smartFilter(rawItems, query, currentCategory);
 
+    // 체험/샘플 상품 따로 저장
+    const sampleKws = ["샘플","체험단","체험상품","후기약속","무료체험","시식","시음","테스터","tester","sample","리뷰어","서포터즈","모니터링","증정","사은품"];
+    sampleRaw = rawItems.filter(i => {
+      const t = strip(i.title).toLowerCase();
+      return sampleKws.some(k => t.includes(k));
+    }).map(i=>({
+      ...i,
+      platform:"naver",
+      shipping: estimateShipping(i),
+      unitInfo: calcUnit(i),
+      official: false,
+      score: 0
+    }));
+
     naverRaw = filtered.map(i=>({
       ...i,
       platform:"naver",
@@ -430,7 +446,7 @@ function buildFilterTabs() {
   const tabs = document.getElementById("filterTabs");
   let html = `
     <button class="ftab active" onclick="applyFilter('popular')" id="ftab-popular">🔥 인기순</button>
-    <button class="ftab" onclick="applyFilter('price')" id="ftab-price">💰 가격순</button>
+    <button class="ftab" onclick="applyFilter('price')" id="ftab-price">💰 가격순 ↑</button>
     <button class="ftab" onclick="applyFilter('free')" id="ftab-free">🚚 무료배송</button>`;
 
   if (currentCategory === "food") {
@@ -442,6 +458,7 @@ function buildFilterTabs() {
   }
 
   html += `
+    <button class="ftab" onclick="applyFilter('sample')" id="ftab-sample">🎁 체험/샘플</button>
     <button class="ftab" onclick="applyFilter('naver')" id="ftab-naver">🟢 네이버</button>
     <button class="ftab" onclick="applyFilter('coupang')" id="ftab-coupang">🟡 쿠팡</button>`;
 
@@ -573,6 +590,7 @@ function renderAI() {
 
 // ─── 필터 적용 ───
 function getFiltered(filter) {
+  if (filter === "sample") return [...sampleRaw].sort((a,b)=>Number(a.lprice)-Number(b.lprice));
   if (filter === "naver") return [...naverRaw];
   if (filter === "coupang") return [...coupangRaw];
 
@@ -582,7 +600,10 @@ function getFiltered(filter) {
     // 네이버 인기순(API 순서) + 쿠팡 분리
     return [...naverRaw, ...coupangRaw];
   }
-  if (filter === "price") return items.sort((a,b)=>Number(a.lprice)-Number(b.lprice));
+  if (filter === "price") {
+    if (priceOrder === "asc") return items.sort((a,b)=>Number(a.lprice)-Number(b.lprice));
+    else return items.sort((a,b)=>Number(b.lprice)-Number(a.lprice));
+  }
   if (filter === "free") return items.filter(i=>i.shipping==="free").sort((a,b)=>Number(a.lprice)-Number(b.lprice));
   if (filter === "unit") return items.filter(i=>i.unitInfo).sort((a,b)=>a.unitInfo.unitPrice-b.unitInfo.unitPrice);
   if (filter === "bulk") return items.filter(i=>i.unitInfo&&(i.unitInfo.qty>=6||i.unitInfo.qty>=400)).sort((a,b)=>a.unitInfo.unitPrice-b.unitInfo.unitPrice);
@@ -591,11 +612,23 @@ function getFiltered(filter) {
 }
 
 function applyFilter(filter) {
+  // 가격순 재클릭 시 최저/최고 토글
+  if (filter === "price" && currentFilter === "price") {
+    priceOrder = priceOrder === "asc" ? "desc" : "asc";
+    const ft = document.getElementById("ftab-price");
+    if(ft) ft.textContent = priceOrder === "asc" ? "💰 가격순 ↑" : "💰 가격순 ↓";
+    displayedCount=0;
+    renderList("price", true);
+    return;
+  }
   currentFilter=filter;
+  if(filter === "price") priceOrder = "asc"; // 새로 클릭하면 최저가부터
   document.querySelectorAll(".ftab").forEach(t=>t.classList.remove("active"));
   const ft=document.getElementById("ftab-"+filter);
   if(ft) ft.classList.add("active");
-  // 가격순일 때만 최저가 배지 표시
+  // 가격순 탭 아이콘 리셋
+  const priceFt = document.getElementById("ftab-price");
+  if(priceFt && filter !== "price") priceFt.textContent = "💰 가격순 ↑";
   const badge = document.getElementById("lowestBadge");
   if(badge) badge.style.display = (filter==="price"||filter==="unit") ? "inline-block" : "none";
   displayedCount=0;
