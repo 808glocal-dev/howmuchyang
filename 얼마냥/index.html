@@ -101,6 +101,29 @@
     .zzim-content{padding:12px;}
     .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#333;color:white;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:500;opacity:0;transition:all 0.3s;z-index:300;white-space:nowrap;}
     .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+    .modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:300;display:none;align-items:flex-end;justify-content:center;}
+    .modal-overlay.open{display:flex;}
+    .modal-box{background:white;border-radius:20px 20px 0 0;padding:24px;width:100%;max-width:480px;animation:slideUp 0.3s ease;}
+    @keyframes slideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+    .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+    .modal-title{font-size:16px;font-weight:900;color:var(--text);}
+    .modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--sub);}
+    .modal-product{display:flex;gap:10px;align-items:center;background:#fff8f5;border-radius:12px;padding:10px;margin-bottom:16px;}
+    .modal-product img{width:50px;height:50px;border-radius:8px;object-fit:cover;border:1px solid #f0f0f0;}
+    .modal-product-info{flex:1;min-width:0;}
+    .modal-product-title{font-size:12px;font-weight:500;color:var(--text);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+    .modal-product-price{font-size:14px;font-weight:900;color:var(--primary);margin-top:2px;}
+    .modal-label{font-size:12px;font-weight:700;color:var(--sub);margin-bottom:6px;}
+    .modal-input{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none;margin-bottom:12px;transition:border 0.2s;}
+    .modal-input:focus{border-color:var(--primary);}
+    .btn-register{width:100%;padding:14px;background:linear-gradient(135deg,var(--primary),var(--secondary));color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;}
+    .btn-register:disabled{opacity:0.6;cursor:not-allowed;}
+    .btn-alarm-card{border:none;border-radius:8px;padding:6px 10px;font-size:14px;cursor:pointer;font-family:inherit;background:#f0f8ff;transition:all 0.2s;}
+    .btn-alarm-card.on{background:#185FA5;color:white;}
+    .modal-donate{background:#f0fff4;border-radius:10px;padding:10px 12px;margin-top:12px;text-align:center;}
+    .modal-donate p{font-size:11px;color:#3B6D11;margin:0;line-height:1.6;}
+    .donate-banner{background:linear-gradient(135deg,#f0fff4,#e8f8e8);border-radius:12px;padding:12px 14px;margin-bottom:14px;border:1px solid #c8e6c9;display:none;}
+    .donate-banner p{font-size:12px;color:#2e7d32;margin:0;line-height:1.7;}
     .section-div{font-size:11px;font-weight:700;color:var(--sub);padding:8px 2px 4px;display:flex;align-items:center;gap:6px;}
     .section-div::after{content:'';flex:1;height:1px;background:var(--border);}
   </style>
@@ -126,6 +149,10 @@
   <div class="loading" id="loading"><div class="paw">🐾</div><p>최저가 찾는 중이냥...</p></div>
   <div class="error-box" id="errorBox"></div>
 
+  <!-- 기부 배너 -->
+  <div class="donate-banner" id="donateBanner">
+    <p>🐱 <strong>얼마냥은 유기묘를 돕고 있어요</strong><br/>이 링크로 구매하면 수익 일부가 유기묘 보호단체에 기부돼요. 쇼핑하면서 고양이도 구해요 🧡</p>
+  </div>
   <div class="ai-section" id="aiSection" style="display:none">
     <div class="ai-section-title" id="aiTitle">🤖 AI 추천 TOP 3</div>
     <div id="aiTop3"></div>
@@ -157,6 +184,25 @@
   <div class="zzim-content" id="zzimContent"></div>
 </div>
 <div class="toast" id="toast"></div>
+
+<!-- 알림 등록 모달 -->
+<div class="modal-overlay" id="alertModal" onclick="closeAlertModal(event)">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title">🔔 최저가 알림 등록</div>
+      <button class="modal-close" onclick="closeAlertModalBtn()">✕</button>
+    </div>
+    <div class="modal-product" id="modalProduct"></div>
+    <div class="modal-label">이메일 주소</div>
+    <input type="email" class="modal-input" id="alertEmail" placeholder="example@email.com"/>
+    <div class="modal-label">목표 가격 (원)</div>
+    <input type="number" class="modal-input" id="alertTargetPrice" placeholder="얼마 이하면 알려드릴까요?"/>
+    <button class="btn-register" id="alertSubmitBtn" onclick="submitAlert()">🔔 알림 등록하기</button>
+    <div class="modal-donate">
+      <p>🐱 얼마냥 수익의 일부는 유기묘 보호단체에 기부돼요<br/>여기서 구매하면 고양이를 도울 수 있어요</p>
+    </div>
+  </div>
+</div>
 
 <script>
 let allItems = [];       // 원본 (필터링 완료)
@@ -407,6 +453,7 @@ function renderAll() {
   const prices = allItems.map(i=>Number(i.lprice)).filter(Boolean);
   const globalMin = Math.min(...prices);
 
+  document.getElementById("donateBanner").style.display = "block";
   document.getElementById("resultCountNum").textContent = allItems.length;
   document.getElementById("lowestBadge").textContent = "최저 "+fmt(globalMin)+"원";
   document.getElementById("resultMeta").style.display = "flex";
@@ -628,6 +675,7 @@ function makeCard(item, globalMin) {
         <div class="product-actions">
           <button class="btn-zzim ${isZzimed?"on":""}" data-id="${id}">${isZzimed?"❤️":"🤍"}</button>
           <button class="btn-buy ${isLowest?"":"gray"}">구매하기</button>
+          <button class="btn-alarm-card" id="alarm_${id}">🔔</button>
         </div>
       </div>
     </div>`;
@@ -648,8 +696,79 @@ function makeCard(item, globalMin) {
     if(url) window.open(url,"_blank");
   });
 
+  card.querySelector(".btn-alarm-card").addEventListener("click",e=>{
+    e.stopPropagation();
+    openAlertModal({
+      title: strip(item.title),
+      price: price,
+      link: item.link||item.productLink||"",
+      image: item.image||""
+    });
+  });
+
   card.addEventListener("click",()=>{ const url=item.link||item.productLink; if(url) window.open(url,"_blank"); });
   return card;
+}
+
+// ─── 알림 모달 ───
+let alertTarget = null;
+
+function openAlertModal(item) {
+  alertTarget = item;
+  const modal = document.getElementById("alertModal");
+  const productDiv = document.getElementById("modalProduct");
+  productDiv.innerHTML = `
+    ${item.image ? `<img src="${item.image}" onerror="this.style.display='none'" />` : ""}
+    <div class="modal-product-info">
+      <div class="modal-product-title">${item.title}</div>
+      <div class="modal-product-price">현재가 ${Number(item.price).toLocaleString("ko-KR")}원</div>
+    </div>`;
+  document.getElementById("alertTargetPrice").value = Math.floor(item.price * 0.9);
+  document.getElementById("alertEmail").value = localStorage.getItem("lastEmail") || "";
+  modal.classList.add("open");
+}
+
+function closeAlertModal(e) {
+  if(e.target === document.getElementById("alertModal")) closeAlertModalBtn();
+}
+function closeAlertModalBtn() {
+  document.getElementById("alertModal").classList.remove("open");
+}
+
+async function submitAlert() {
+  const email = document.getElementById("alertEmail").value.trim();
+  const targetPrice = document.getElementById("alertTargetPrice").value;
+  const btn = document.getElementById("alertSubmitBtn");
+
+  if (!email || !targetPrice) { showToast("이메일과 목표가를 입력해주세요"); return; }
+  if (!alertTarget) return;
+
+  btn.disabled = true;
+  btn.textContent = "등록 중...";
+
+  try {
+    const res = await fetch("/.netlify/functions/register-alert", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        productTitle: alertTarget.title,
+        productLink: alertTarget.link,
+        productImage: alertTarget.image,
+        currentPrice: alertTarget.price,
+        targetPrice: Number(targetPrice)
+      })
+    });
+    const data = await res.json();
+    localStorage.setItem("lastEmail", email);
+    showToast(data.message || "알림 등록 완료! 🐱");
+    closeAlertModalBtn();
+  } catch(e) {
+    showToast("등록 오류가 발생했어요 😿");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "🔔 알림 등록하기";
+  }
 }
 
 function updateZzimCount(){ document.getElementById("zzimCount").textContent=zzimList.length; }
