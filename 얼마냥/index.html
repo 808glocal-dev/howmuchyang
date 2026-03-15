@@ -395,7 +395,7 @@ async function doSearch() {
     // 쿠팡: 네이버 결과 기반 모의 (API 승인 대기) + 추적 링크 적용
     const coupangLink = data.coupangLink || `https://www.coupang.com/np/search?q=${encodeURIComponent(query)}`;
     window._coupangLink = coupangLink;
-    const afId = "d4YZ7m";
+    // AF_ID 상수 사용
     coupangRaw = naverRaw.slice(0,8).map(item=>{
       const productTitle = strip(item.title).replace(/<[^>]*>/g,"").substring(0,30);
       // 무조건 내 추적링크로만 생성 - 네이버 원본 링크 절대 사용 안 함
@@ -841,17 +841,16 @@ function renderList(filter, reset) {
 
 function loadMore(){ renderList(currentFilter,false); }
 
+const AF_ID = "d4YZ7m";
+
 function cleanLink(url, title) {
   if (!url) return url;
+  const q = encodeURIComponent((title||"").replace(/<[^>]*>/g,"").substring(0,30));
+  // 이미 내 추적링크면 그대로
+  if (url.includes("link.coupang.com/a/" + AF_ID)) return url;
   // 쿠팡 링크면 무조건 내 추적링크로 교체
   if (url.includes("coupang.com") || url.includes("coupa.ng")) {
-    const q = encodeURIComponent((title||"").replace(/<[^>]*>/g,"").substring(0,30));
-    const base = window._coupangLink || "https://www.coupang.com/np/search";
-    // _coupangLink가 검색URL 형태면 q 교체, 아니면 새로 생성
-    if (window._coupangLink && window._coupangLink.includes("link.coupang.com")) {
-      return window._coupangLink.split("?")[0] + "?q=" + q;
-    }
-    return `https://www.coupang.com/np/search?q=${q}`;
+    return `https://link.coupang.com/a/${AF_ID}?q=${q}`;
   }
   return url;
 }
