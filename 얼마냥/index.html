@@ -683,18 +683,9 @@ function renderAI() {
         <div class="ai-price ${ranks[i]}">${fmt(price)}원</div>
         ${ui&&currentCategory==="food"?`<div class="ai-unit">1${ui.unit}당 ${fmt(ui.unitPrice)}원</div>`:""}
       </div>`;
-    card.addEventListener("click",()=>{
-    const t = strip(item.title).replace(/<[^>]*>/g,"").substring(0,30);
-    const mall = (item.mallName||"").toLowerCase();
-    let url;
-    if (item.platform === "coupang" || mall.includes("쿠팡") || mall.includes("coupang")) {
-      url = `https://link.coupang.com/a/${AF_ID}?q=${encodeURIComponent(t)}`;
-    } else {
-      url = item.link || item.productLink || "";
-      if (url.includes("lptag=") || url.includes("coupang.com")) {
-        url = `https://link.coupang.com/a/${AF_ID}?q=${encodeURIComponent(t)}`;
-      }
-    }
+    card.addEventListener("click",e=>{
+    if(e.target.closest(".btn-zzim,.btn-buy,.btn-share")) return;
+    const url = getProductUrl(card);
     if(url) window.open(url,"_blank");
   });
     container.appendChild(card);
@@ -877,6 +868,22 @@ function loadMore(){ renderList(currentFilter,false); }
 
 const AF_ID = "d4YZ7m";
 
+// 상품 URL 생성 - 쿠팡이면 내 추적링크, 네이버면 원본 링크
+function getProductUrl(card) {
+  const title = card.dataset.title || "";
+  const platform = card.dataset.platform || "";
+  const mall = card.dataset.mall || "";
+  const link = card.dataset.link || "";
+  const q = encodeURIComponent(title);
+  // 쿠팡이면 무조건 내 추적링크
+  if (platform === "coupang" || mall.includes("쿠팡") || mall.includes("coupang") ||
+      link.includes("lptag=") || link.includes("coupang.com") || link.includes("coupa.ng")) {
+    return `https://link.coupang.com/a/${AF_ID}?q=${q}`;
+  }
+  // 네이버면 원본 링크
+  return link;
+}
+
 function cleanLink(url, title, mallName) {
   if (!url) return url;
   const q = encodeURIComponent((title||"").replace(/<[^>]*>/g,"").substring(0,30));
@@ -937,6 +944,10 @@ function makeCard(item, globalMin) {
 
   const card = document.createElement("div");
   card.className = "product-card" + (isLowest?" is-lowest":"");
+  card.dataset.title = strip(item.title).replace(/<[^>]*>/g,"").substring(0,30);
+  card.dataset.platform = item.platform;
+  card.dataset.mall = (item.mallName||"").toLowerCase();
+  card.dataset.link = item.link||item.productLink||"";
   card.innerHTML = `
     <img class="product-img" src="${item.image||""}" alt="" onerror="this.outerHTML='<div class=product-img-ph>🛍️</div>'" />
     <div class="product-info">
@@ -975,19 +986,7 @@ function makeCard(item, globalMin) {
 
   card.querySelector(".btn-buy").addEventListener("click",e=>{
     e.stopPropagation();
-    const t = strip(item.title).replace(/<[^>]*>/g,"").substring(0,30);
-    const mall = (item.mallName||"").toLowerCase();
-    let url;
-    // 쿠팡 플랫폼이거나 mallName에 쿠팡 포함되면 무조건 내 추적링크
-    if (item.platform === "coupang" || mall.includes("쿠팡") || mall.includes("coupang")) {
-      url = `https://link.coupang.com/a/${AF_ID}?q=${encodeURIComponent(t)}`;
-    } else {
-      // 네이버 상품은 원본 링크 사용 (단 lptag 있으면 내 추적링크로)
-      url = item.link || item.productLink || "";
-      if (url.includes("lptag=") || url.includes("coupang.com")) {
-        url = `https://link.coupang.com/a/${AF_ID}?q=${encodeURIComponent(t)}`;
-      }
-    }
+    const url = getProductUrl(card);
     if(url) window.open(url,"_blank");
   });
 
@@ -995,34 +994,28 @@ function makeCard(item, globalMin) {
   if (shareBtn) {
     shareBtn.addEventListener("click", e => {
       e.stopPropagation();
-      const t = strip(item.title).substring(0,30);
+      const t = strip(item.title).replace(/<[^>]*>/g,"").substring(0,30);
       const p = fmt(Number(item.lprice));
-      const mall2 = (item.mallName||"").toLowerCase();
-      const tEnc = encodeURIComponent(t);
-      const shareUrl = (item.platform==="coupang"||mall2.includes("쿠팡")||mall2.includes("coupang"))
-        ? `https://link.coupang.com/a/${AF_ID}?q=${tEnc}`
-        : (item.link||item.productLink||"https://howmuchyang.netlify.app");
-      const txt = `${t} - ${p}원\n${shareUrl}\n\n최저가는 얼마냥에서!\nhttps://howmuchyang.netlify.app`;
+      // 공유 URL: 앱 + 검색어 파라미터 (받는 사람이 열면 자동 검색됨)
+      const appUrl = `https://howmuchyang.netlify.app?q=${encodeURIComponent(currentQuery||t)}`;
+      const productUrl = getProductUrl(card);
+      const txt = `🐱 ${t}
+💰 ${p}원
+
+구매: ${productUrl}
+
+최저가 비교: ${appUrl}`;
       if (navigator.share) {
-        navigator.share({ title: t, text: txt, url: "https://howmuchyang.netlify.app" });
+        navigator.share({ title: t, text: txt, url: appUrl });
       } else {
         navigator.clipboard.writeText(txt).then(() => showToast("복사됐어요! 🐱"));
       }
     });
   }
 
-  card.addEventListener("click",()=>{
-    const t = strip(item.title).replace(/<[^>]*>/g,"").substring(0,30);
-    const mall = (item.mallName||"").toLowerCase();
-    let url;
-    if (item.platform === "coupang" || mall.includes("쿠팡") || mall.includes("coupang")) {
-      url = `https://link.coupang.com/a/${AF_ID}?q=${encodeURIComponent(t)}`;
-    } else {
-      url = item.link || item.productLink || "";
-      if (url.includes("lptag=") || url.includes("coupang.com")) {
-        url = `https://link.coupang.com/a/${AF_ID}?q=${encodeURIComponent(t)}`;
-      }
-    }
+  card.addEventListener("click",e=>{
+    if(e.target.closest(".btn-zzim,.btn-buy,.btn-share")) return;
+    const url = getProductUrl(card);
     if(url) window.open(url,"_blank");
   });
   return card;
@@ -1051,6 +1044,15 @@ window.open = function(url, target, features) {
   }
   return _origOpen(url, target, features);
 };
+// URL 파라미터로 자동 검색
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const q = params.get("q");
+  if (q) {
+    document.getElementById("searchInput").value = q;
+    setTimeout(() => doSearch(), 300);
+  }
+})();
 </script>
 </body>
 </html>
