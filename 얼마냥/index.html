@@ -475,6 +475,7 @@ function renderAll() {
   document.getElementById("lowestBadge").textContent = "최저 "+fmt(globalMin)+"원";
   document.getElementById("resultMeta").style.display = "flex";
 
+  buildFilterTabs();
   renderAI();
   displayedCount = 0;
   renderList("popular", true);
@@ -672,7 +673,7 @@ function getFiltered(filter) {
   }
 
   if (filter === "popular") {
-    return hardFilter([...coupangRaw, ...naverRaw]);
+    return [...coupangRaw, ...naverRaw]; // naverRaw는 이미 smartFilter 거침
   }
   if (filter === "price" || filter === "price_asc") {
     return [...items].sort((a,b)=>Number(a.lprice)-Number(b.lprice));
