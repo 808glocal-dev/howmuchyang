@@ -131,7 +131,7 @@
     <p>🐱 <strong>얼마냥은 유기묘를 돕고 있어요</strong><br/>이 링크로 구매하면 수익 일부가 유기묘 보호단체에 기부돼요. 쇼핑하면서 고양이도 구해요 🧡</p>
   </div>
   <div class="ai-section" id="aiSection" style="display:none">
-    <div class="ai-section-title" id="aiTitle">🤖 AI 추천 TOP 3</div>
+    <div class="ai-section-title" id="aiTitle">🤖 AI 추천 TOP 5</div>
     <div id="aiTop3"></div>
     <div class="ai-reason" id="aiReason">
       <div class="ai-reason-title">🤖 AI 추천 근거</div>
@@ -448,13 +448,13 @@ function filterByBrand(brand) {
 function buildFilterTabs() {
   const tabs = document.getElementById("filterTabs");
   let html = `
-    <button class="ftab active" onclick="applyFilter('popular')" id="ftab-popular">🔥 판매인기순</button>
+    <button class="ftab active" onclick="applyFilter('popular')" id="ftab-popular">🔥 인기순</button>
     <button class="ftab" onclick="applyFilter('price_asc')" id="ftab-price_asc">💰 최저가</button>
     <button class="ftab" onclick="applyFilter('price_desc')" id="ftab-price_desc">💸 최고가</button>
     <button class="ftab" onclick="applyFilter('free')" id="ftab-free">🚚 무료배송</button>`;
 
   if (currentCategory === "food") {
-    html += `<button class="ftab" onclick="applyFilter('value')" id="ftab-value">⚖️ 단가/묶음</button>`;
+    html += `<button class="ftab" onclick="applyFilter('value')" id="ftab-value">⚖️ 단가순</button>`;
   }
 
   html += `
@@ -506,12 +506,31 @@ function renderAI() {
     const freeShip = pool.find(i=>i.shipping==="free") || pool[0];
     const official = pool.find(i=>i.official) || pool[1] || pool[0];
 
-    candidates = [cheapest, freeShip, official].filter(Boolean);
-    labels = ["💰 최저가", "🚚 무료배송 포함 최저", "🏪 공식/신뢰 판매처"];
+    const midPrice = pool.filter(i=>Number(i.lprice) > Number(cheapest?.lprice)).sort((a,b)=>Number(a.lprice)-Number(b.lprice))[0] || pool[1];
+    const popular = pool.find(i=>i.score === Math.max(...pool.map(x=>x.score))) || pool[2];
+
+    candidates = [cheapest, freeShip, official, midPrice, popular].filter(Boolean);
+    // 중복 제거
+    const seen = new Set();
+    const unique = candidates.filter(i => {
+      if (!i || seen.has(i.link)) return false;
+      seen.add(i.link);
+      return true;
+    });
+    // 부족하면 pool에서 채우기
+    let idx = 0;
+    while (unique.length < 5 && idx < pool.length) {
+      if (!seen.has(pool[idx].link)) { seen.add(pool[idx].link); unique.push(pool[idx]); }
+      idx++;
+    }
+    candidates = unique;
+    labels = ["💰 최저가", "🚚 무료배송", "🏪 공식판매처", "💡 가성비", "🔥 인기상품"];
     reasons = [
-      `${fmt(Number(cheapest?.lprice))}원으로 검색 결과 중 가장 저렴해요. 가격만 보면 이게 최선이에요.`,
-      `배송비 없이 ${fmt(Number(freeShip?.lprice))}원. 배송비 포함 실제 부담 비용이 낮아요.`,
-      `공식 또는 신뢰도 높은 판매처. 가격이 조금 높더라도 A/S와 정품 보장이 확실해요.`
+      `${fmt(Number(candidates[0]?.lprice))}원으로 검색 결과 중 가장 저렴해요.`,
+      `배송비 없이 ${fmt(Number(candidates[1]?.lprice))}원. 실제 부담 비용이 낮아요.`,
+      `공식 또는 신뢰도 높은 판매처. A/S와 정품 보장이 확실해요.`,
+      `가격과 품질의 균형이 좋은 선택이에요.`,
+      `판매 인기도가 높은 상품이에요.`
     ];
   } else if (currentCategory === "food") {
     const withUnit = naverSorted.filter(i=>i.unitInfo);
@@ -520,8 +539,24 @@ function renderAI() {
     const unitBest = byUnit[0];
     const priceBest = [...naverSorted].sort((a,b)=>Number(a.lprice)-Number(b.lprice))[0];
 
-    candidates = [bulkBest||unitBest||priceBest, byUnit[1]||naverSorted[1], priceBest].filter(Boolean);
-    labels = ["📦 묶음 단가 최저", "⚖️ 중간 용량 추천", "💰 소량 최저가"];
+    const freeFoodItem = naverSorted.find(i=>i.shipping==="free") || naverSorted[3];
+    const popularFood = [...naverSorted].sort((a,b)=>b.score-a.score)[0] || naverSorted[4];
+    
+    candidates = [bulkBest||unitBest||priceBest, byUnit[1]||naverSorted[1], priceBest, freeFoodItem, popularFood].filter(Boolean);
+    // 중복 제거
+    const seenF = new Set();
+    const uniqueF = candidates.filter(i => {
+      if (!i || seenF.has(i.link)) return false;
+      seenF.add(i.link);
+      return true;
+    });
+    let fi = 0;
+    while (uniqueF.length < 5 && fi < naverSorted.length) {
+      if (!seenF.has(naverSorted[fi].link)) { seenF.add(naverSorted[fi].link); uniqueF.push(naverSorted[fi]); }
+      fi++;
+    }
+    candidates = uniqueF;
+    labels = ["📦 묶음 단가 최저", "⚖️ 중간 용량 추천", "💰 소량 최저가", "🚚 무료배송", "🔥 인기상품"];
     reasons = [
       candidates[0]?.unitInfo ? `1${candidates[0].unitInfo.unit}당 ${fmt(candidates[0].unitInfo.unitPrice)}원으로 묶음 기준 단가가 가장 저렴해요. 장기 급여 시 최고 선택.` : "가성비 최고 상품이에요.",
       candidates[1]?.unitInfo ? `${candidates[1].unitInfo.qty}${candidates[1].unitInfo.unit} 구성. 부담 없이 시작하기 좋고 단가도 합리적이에요.` : "중간 가격대로 균형 잡힌 선택이에요.",
@@ -533,8 +568,23 @@ function renderAI() {
     const freeShip = naverSorted.find(i=>i.shipping==="free") || byPrice[1];
     const popular = naverSorted[0]; // API 인기 1위
 
-    candidates = [cheapest, freeShip, popular].filter(Boolean);
-    labels = ["💰 최저가", "🚚 무료배송 최저", "🔥 인기 1위"];
+    const midG = byPrice[1] || byPrice[0];
+    const official2 = naverSorted.find(i=>i.official) || byPrice[2];
+    candidates = [cheapest, freeShip, popular, midG, official2].filter(Boolean);
+    // 중복 제거
+    const seenG = new Set();
+    const uniqueG = candidates.filter(i => {
+      if (!i || seenG.has(i.link)) return false;
+      seenG.add(i.link);
+      return true;
+    });
+    let gi = 0;
+    while (uniqueG.length < 5 && gi < naverSorted.length) {
+      if (!seenG.has(naverSorted[gi].link)) { seenG.add(naverSorted[gi].link); uniqueG.push(naverSorted[gi]); }
+      gi++;
+    }
+    candidates = uniqueG;
+    labels = ["💰 최저가", "🚚 무료배송", "🔥 인기 1위", "💡 가성비", "🏪 신뢰 판매처"];
     reasons = [
       `${fmt(Number(cheapest?.lprice))}원으로 전체 결과 중 가장 저렴해요.`,
       `무료배송 조건에서 가장 저렴한 ${fmt(Number(freeShip?.lprice))}원이에요.`,
@@ -594,7 +644,7 @@ function renderAI() {
   });
 
   const catLabel = currentCategory==="electronics"?"📱 전자제품":currentCategory==="food"?"🐾 식품/소모품":"🛍️ 일반";
-  document.getElementById("aiTitle").textContent = `🤖 AI 추천 TOP 3 · ${catLabel}`;
+  document.getElementById("aiTitle").textContent = `🤖 AI 추천 TOP 5 · ${catLabel}`;
   document.getElementById("aiSection").style.display="block";
   document.getElementById("aiReason").style.display="block";
 }
@@ -622,7 +672,7 @@ function getFiltered(filter) {
   }
 
   if (filter === "popular") {
-    return [...coupangRaw, ...naverRaw];
+    return hardFilter([...coupangRaw, ...naverRaw]);
   }
   if (filter === "price" || filter === "price_asc") {
     return [...items].sort((a,b)=>Number(a.lprice)-Number(b.lprice));
@@ -670,8 +720,6 @@ async function applyFilter(filter) {
   // 탭별 API 재호출
   if (filter === "price_asc" || filter === "value") {
     await fetchAndUpdate("asc");
-  } else if (filter === "price_desc") {
-    await fetchAndUpdate("dsc");
   } else if (filter === "popular") {
     await fetchAndUpdate("sim");
   }
