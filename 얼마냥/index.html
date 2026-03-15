@@ -663,7 +663,7 @@ function renderAI() {
         <div class="ai-price ${ranks[i]}">${fmt(price)}원</div>
         ${ui&&currentCategory==="food"?`<div class="ai-unit">1${ui.unit}당 ${fmt(ui.unitPrice)}원</div>`:""}
       </div>`;
-    card.addEventListener("click",()=>{ const url=item.link||item.productLink; if(url) window.open(url,"_blank"); });
+    card.addEventListener("click",()=>{ const url=cleanLink(item.link||item.productLink||"", strip(item.title)); if(url) window.open(url,"_blank"); });
     container.appendChild(card);
   });
 
@@ -842,6 +842,19 @@ function renderList(filter, reset) {
 
 function loadMore(){ renderList(currentFilter,false); }
 
+function cleanLink(url, title) {
+  if (!url) return url;
+  // 쿠팡 링크면 무조건 내 추적링크로 교체
+  if (url.includes("coupang.com") || url.includes("coupa.ng")) {
+    const q = encodeURIComponent((title||"").substring(0,30));
+    if (window._coupangLink) {
+      return window._coupangLink.replace(/q=[^&]*/, "q=" + q);
+    }
+    return `https://www.coupang.com/np/search?q=${q}`;
+  }
+  return url;
+}
+
 function makeCard(item, globalMin) {
   const price = Number(item.lprice);
   const hprice = Number(item.hprice) || 0;
@@ -924,15 +937,7 @@ function makeCard(item, globalMin) {
 
   card.querySelector(".btn-buy").addEventListener("click",e=>{
     e.stopPropagation();
-    let url = item.link||item.productLink||"";
-    // 쿠팡 링크면 추적 링크로 교체
-    if (url.includes("coupang.com") && window._coupangLink) {
-      const title = strip(item.title).substring(0,30);
-      url = window._coupangLink.replace(
-        /q=[^&]*/,
-        "q=" + encodeURIComponent(title)
-      );
-    }
+    const url = cleanLink(item.link||item.productLink||"", strip(item.title));
     if(url) window.open(url,"_blank");
   });
 
@@ -952,7 +957,7 @@ https://howmuchyang.netlify.app`;
     }
   });
 
-  card.addEventListener("click",()=>{ const url=item.link||item.productLink; if(url) window.open(url,"_blank"); });
+  card.addEventListener("click",()=>{ const url=cleanLink(item.link||item.productLink||"", strip(item.title)); if(url) window.open(url,"_blank"); });
   return card;
 }
 
