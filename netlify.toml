@@ -1,5 +1,5 @@
 [build]
-  publish = "."
+  publish = "얼마냥"
   command = ""
 
 [functions]
