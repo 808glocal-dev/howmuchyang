@@ -394,6 +394,7 @@ async function doSearch() {
 
     // 쿠팡: 네이버 결과 기반 모의 (API 승인 대기) + 추적 링크 적용
     const coupangLink = data.coupangLink || `https://www.coupang.com/np/search?q=${encodeURIComponent(query)}`;
+    window._coupangLink = coupangLink;
     coupangRaw = naverRaw.slice(0,8).map(item=>{
       // 상품명으로 쿠팡 개별 검색 링크 생성 (추적코드 포함)
       const productTitle = strip(item.title).substring(0, 30);
@@ -923,7 +924,15 @@ function makeCard(item, globalMin) {
 
   card.querySelector(".btn-buy").addEventListener("click",e=>{
     e.stopPropagation();
-    const url=item.link||item.productLink;
+    let url = item.link||item.productLink||"";
+    // 쿠팡 링크면 추적 링크로 교체
+    if (url.includes("coupang.com") && window._coupangLink) {
+      const title = strip(item.title).substring(0,30);
+      url = window._coupangLink.replace(
+        /q=[^&]*/,
+        "q=" + encodeURIComponent(title)
+      );
+    }
     if(url) window.open(url,"_blank");
   });
 
