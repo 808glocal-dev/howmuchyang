@@ -443,14 +443,14 @@ function buildFilterTabs() {
   const tabs = document.getElementById("filterTabs");
   let html = `
     <button class="ftab active" onclick="applyFilter('popular')" id="ftab-popular">🔥 판매인기순</button>
-    <button class="ftab" onclick="applyFilter('price')" id="ftab-price">💰 최저가 ↑</button>`;
+    <button class="ftab" onclick="applyFilter('price')" id="ftab-price">💰 최저가 ↑</button>
+    <button class="ftab" onclick="applyFilter('free')" id="ftab-free">🚚 무료배송</button>`;
 
   if (currentCategory === "food") {
     html += `<button class="ftab" onclick="applyFilter('value')" id="ftab-value">⚖️ 단가/묶음</button>`;
   }
 
   html += `
-    <button class="ftab" onclick="applyFilter('free')" id="ftab-free">🚚 무료배송</button>
     <button class="ftab" onclick="applyFilter('naver')" id="ftab-naver">🟢 네이버</button>
     <button class="ftab" onclick="applyFilter('coupang')" id="ftab-coupang">🟡 쿠팡</button>`;
 
@@ -475,8 +475,15 @@ function renderAll() {
 
 // ─── AI 추천 (카테고리별) ───
 function renderAI() {
-  // 인기순(API 순서) 기준으로 후보 선정
-  const naverSorted = [...naverRaw]; // API 인기순 유지
+  // 체험/샘플 완전 제거 후 후보 선정
+  const naverSorted = naverRaw.filter(item => {
+    const title = strip(item.title).toLowerCase();
+    const price = Number(item.lprice);
+    if (GIFT_KW.some(k => title.includes(k))) return false;
+    if (price <= 100) return false;
+    if (currentCategory === "food" && price < 500) return false;
+    return true;
+  });
   let candidates = [];
   let labels = [];
   let reasons = [];
@@ -580,12 +587,22 @@ function renderAI() {
 }
 
 // ─── 필터 적용 ───
-function getFiltered(filter) {
-  if (filter === "sample") return [...sampleRaw].sort((a,b)=>Number(a.lprice)-Number(b.lprice));
-  if (filter === "naver") return [...naverRaw];
-  if (filter === "coupang") return [...coupangRaw];
+function hardFilter(items) {
+  return items.filter(item => {
+    const title = strip(item.title).toLowerCase();
+    const price = Number(item.lprice);
+    if (GIFT_KW.some(k => title.includes(k))) return false;
+    if (price <= 100) return false;
+    if ((currentCategory === "food") && price < 500) return false;
+    return true;
+  });
+}
 
-  let items = [...coupangRaw, ...naverRaw];
+function getFiltered(filter) {
+  if (filter === "naver") return hardFilter([...naverRaw]);
+  if (filter === "coupang") return hardFilter([...coupangRaw]);
+
+  let items = hardFilter([...coupangRaw, ...naverRaw]);
   // 브랜드 필터
   if (activeBrand && activeBrand !== "전체") {
     items = items.filter(i => (i.brand||i.maker||"") === activeBrand);
@@ -620,7 +637,7 @@ async function applyFilter(filter) {
     displayedCount=0;
     renderList("price", true);
     setTimeout(() => {
-      document.getElementById("productList").scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("resultMeta").scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);
     return;
   }
@@ -647,7 +664,7 @@ async function applyFilter(filter) {
   displayedCount=0;
   renderList(filter, true);
   setTimeout(() => {
-    document.getElementById("productList").scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("resultMeta").scrollIntoView({ behavior: "smooth", block: "start" });
   }, 100);
 }
 
