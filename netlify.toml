@@ -3,4 +3,4 @@
   command = ""
 
 [functions]
-  directory = "얼마냥/netlify/functions"
+  directory = "netlify/functions"
