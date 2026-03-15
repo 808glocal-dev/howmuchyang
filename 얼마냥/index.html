@@ -846,9 +846,11 @@ function cleanLink(url, title) {
   if (!url) return url;
   // 쿠팡 링크면 무조건 내 추적링크로 교체
   if (url.includes("coupang.com") || url.includes("coupa.ng")) {
-    const q = encodeURIComponent((title||"").substring(0,30));
-    if (window._coupangLink) {
-      return window._coupangLink.replace(/q=[^&]*/, "q=" + q);
+    const q = encodeURIComponent((title||"").replace(/<[^>]*>/g,"").substring(0,30));
+    const base = window._coupangLink || "https://www.coupang.com/np/search";
+    // _coupangLink가 검색URL 형태면 q 교체, 아니면 새로 생성
+    if (window._coupangLink && window._coupangLink.includes("link.coupang.com")) {
+      return window._coupangLink.split("?")[0] + "?q=" + q;
     }
     return `https://www.coupang.com/np/search?q=${q}`;
   }
@@ -942,20 +944,21 @@ function makeCard(item, globalMin) {
   });
 
   const shareBtn = card.querySelector(".btn-share");
-  if(shareBtn) shareBtn.addEventListener("click",e=>{
-    e.stopPropagation();
-    const title = strip(item.title).substring(0,30);
-    const price = fmt(Number(item.lprice));
-    const url = item.link||item.productLink||"";
-    const shareText = `${title} - ${price}원
+  if (shareBtn) {
+    shareBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      const t = strip(item.title).substring(0,30);
+      const p = fmt(Number(item.lprice));
+      const txt = `${t} - ${p}원
 최저가는 얼마냥에서!
 https://howmuchyang.netlify.app`;
-    if (navigator.share) {
-      navigator.share({ title: title, text: shareText, url: "https://howmuchyang.netlify.app" });
-    } else {
-      navigator.clipboard.writeText(shareText).then(()=>showToast("링크 복사됐어요! 🐱"));
-    }
-  });
+      if (navigator.share) {
+        navigator.share({ title: t, text: txt, url: "https://howmuchyang.netlify.app" });
+      } else {
+        navigator.clipboard.writeText(txt).then(() => showToast("복사됐어요! 🐱"));
+      }
+    });
+  }
 
   card.addEventListener("click",()=>{ const url=cleanLink(item.link||item.productLink||"", strip(item.title)); if(url) window.open(url,"_blank"); });
   return card;
