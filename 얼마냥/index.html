@@ -418,19 +418,15 @@ function calcScore(item, query, platform) {
 function buildFilterTabs() {
   const tabs = document.getElementById("filterTabs");
   let html = `
-    <button class="ftab active" onclick="applyFilter('popular')" id="ftab-popular">🔥 인기순</button>
-    <button class="ftab" onclick="applyFilter('price')" id="ftab-price">💰 최저가 ↑</button>
-    <button class="ftab" onclick="applyFilter('free')" id="ftab-free">🚚 무료배송</button>`;
+    <button class="ftab active" onclick="applyFilter('popular')" id="ftab-popular">🔥 판매인기순</button>
+    <button class="ftab" onclick="applyFilter('price')" id="ftab-price">💰 최저가 ↑</button>`;
 
   if (currentCategory === "food") {
-    html += `
-      <button class="ftab" onclick="applyFilter('unit')" id="ftab-unit">⚖️ 단가순</button>
-      <button class="ftab" onclick="applyFilter('bulk')" id="ftab-bulk">📦 묶음최저</button>`;
-  } else if (currentCategory === "electronics") {
-    html += `<button class="ftab" onclick="applyFilter('official')" id="ftab-official">🏪 공식판매처</button>`;
+    html += `<button class="ftab" onclick="applyFilter('value')" id="ftab-value">⚖️ 단가/묶음</button>`;
   }
 
   html += `
+    <button class="ftab" onclick="applyFilter('free')" id="ftab-free">🚚 무료배송</button>
     <button class="ftab" onclick="applyFilter('naver')" id="ftab-naver">🟢 네이버</button>
     <button class="ftab" onclick="applyFilter('coupang')" id="ftab-coupang">🟡 쿠팡</button>`;
 
@@ -578,10 +574,16 @@ function getFiltered(filter) {
   if (filter === "unit") return items.filter(i=>i.unitInfo).sort((a,b)=>a.unitInfo.unitPrice-b.unitInfo.unitPrice);
   if (filter === "bulk") return items.filter(i=>i.unitInfo&&(i.unitInfo.qty>=6||i.unitInfo.qty>=400)).sort((a,b)=>a.unitInfo.unitPrice-b.unitInfo.unitPrice);
   if (filter === "official") return [...items.filter(i=>i.official), ...items.filter(i=>!i.official)];
+  if (filter === "value") {
+    // 단가 있는 것: 단가순 정렬 / 단가 없는 것: 가격순
+    const withUnit = items.filter(i=>i.unitInfo).sort((a,b)=>a.unitInfo.unitPrice-b.unitInfo.unitPrice);
+    const withoutUnit = items.filter(i=>!i.unitInfo).sort((a,b)=>Number(a.lprice)-Number(b.lprice));
+    return [...withUnit, ...withoutUnit];
+  }
   return items;
 }
 
-function applyFilter(filter) {
+async function applyFilter(filter) {
   // 가격순 재클릭 시 최저/최고 토글
   if (filter === "price" && currentFilter === "price") {
     priceOrder = priceOrder === "asc" ? "desc" : "asc";
@@ -589,27 +591,70 @@ function applyFilter(filter) {
     if(ft) ft.textContent = priceOrder === "asc" ? "💰 최저가 ↑" : "💰 최고가 ↓";
     displayedCount=0;
     renderList("price", true);
-    // 상품 목록으로 스크롤
     setTimeout(() => {
       document.getElementById("productList").scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);
     return;
   }
-  currentFilter=filter;
-  if(filter === "price") { priceOrder = "asc"; }
+
+  currentFilter = filter;
+  if(filter === "price") priceOrder = "asc";
+
   document.querySelectorAll(".ftab").forEach(t=>t.classList.remove("active"));
-  const ft=document.getElementById("ftab-"+filter);
+  const ft = document.getElementById("ftab-"+filter);
   if(ft) ft.classList.add("active");
+
   const priceFt = document.getElementById("ftab-price");
   if(priceFt && filter !== "price") priceFt.textContent = "💰 최저가 ↑";
-  const badge = document.getElementById("lowestBadge");
-  if(badge) badge.style.display = (filter==="price"||filter==="unit") ? "inline-block" : "none";
+
+  // 탭별 API 재호출
+  if (filter === "price" || filter === "value") {
+    // 최저가/단가 탭: sort=asc로 새 데이터
+    await fetchAndUpdate("asc");
+  } else if (filter === "popular") {
+    // 인기순: sort=sim으로 새 데이터
+    await fetchAndUpdate("sim");
+  }
+
   displayedCount=0;
-  renderList(filter,true);
-  // 상품 목록으로 스크롤
+  renderList(filter, true);
   setTimeout(() => {
     document.getElementById("productList").scrollIntoView({ behavior: "smooth", block: "start" });
   }, 100);
+}
+
+async function fetchAndUpdate(sort) {
+  if (!currentQuery) return;
+  try {
+    document.getElementById("loading").style.display = "block";
+    const res = await fetch(`/.netlify/functions/search?query=${encodeURIComponent(currentQuery)}&sort=${sort}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const rawItems = data.items || [];
+    const filtered = smartFilter(rawItems, currentQuery, currentCategory);
+    naverRaw = filtered.map(i=>({
+      ...i,
+      platform:"naver",
+      shipping: estimateShipping(i),
+      unitInfo: calcUnit(i),
+      official: isOfficial(i),
+      score: calcScore(i, currentQuery, "naver")
+    }));
+    coupangRaw = naverRaw.slice(0,8).map(item=>({
+      ...item,
+      platform:"coupang",
+      lprice: Math.floor(Number(item.lprice)*(0.88+Math.random()*0.15)),
+      mallName:"쿠팡",
+      shipping:"free",
+      official:false,
+      link:`https://www.coupang.com/np/search?q=${encodeURIComponent(currentQuery)}`
+    })).map(i=>({...i, unitInfo:calcUnit(i), score:calcScore(i,currentQuery,"coupang")}));
+    allItems = [...coupangRaw, ...naverRaw];
+  } catch(e) {
+    console.log("재호출 오류:", e.message);
+  } finally {
+    document.getElementById("loading").style.display = "none";
+  }
 }
 
 function renderList(filter, reset) {
