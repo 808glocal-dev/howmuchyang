@@ -129,6 +129,7 @@
   <!-- 기부 배너 -->
   <div class="donate-banner" id="donateBanner" style="display:block">
     <p>🐱 <strong>얼마냥은 유기묘를 돕고 있어요</strong><br/>이 링크로 구매하면 수익 일부가 유기묘 보호단체에 기부돼요. 쇼핑하면서 고양이도 구해요 🧡</p>
+    <p style="font-size:10px;color:#888;margin:4px 0 0;">이 사이트의 쿠팡 링크는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.</p>
   </div>
   <div class="ai-section" id="aiSection" style="display:none">
     <div class="ai-section-title" id="aiTitle">🤖 AI 추천 TOP 10</div>
@@ -389,7 +390,8 @@ async function doSearch() {
       score: calcScore(i, query, "naver")
     }));
 
-    // 쿠팡: 네이버 결과 기반 모의 (API 승인 대기)
+    // 쿠팡: 네이버 결과 기반 모의 (API 승인 대기) + 추적 링크 적용
+    const coupangLink = data.coupangLink || `https://www.coupang.com/np/search?q=${encodeURIComponent(query)}`;
     coupangRaw = naverRaw.slice(0,8).map(item=>({
       ...item,
       platform:"coupang",
@@ -397,7 +399,7 @@ async function doSearch() {
       mallName:"쿠팡",
       shipping:"free",
       official:false,
-      link:`https://www.coupang.com/np/search?q=${encodeURIComponent(query)}`
+      link: coupangLink
     })).map(i=>({...i, unitInfo:calcUnit(i), score:calcScore(i,query,"coupang")}));
 
     // 기본: 인기순 (API 순서 = 관련도+판매량 기반)
