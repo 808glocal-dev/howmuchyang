@@ -1,9 +1,9 @@
 const https = require("https");
 const { getStore } = require("@netlify/blobs");
 
-// 매일 오전 9시 실행
+// 매일 오전 9시 실행 (KST = UTC+9, 즉 UTC 0시)
 exports.config = {
-  schedule: "0 0 9 * * *"
+  schedule: "0 0 * * *"
 };
 
 const CLIENT_ID = process.env.NAVER_CLIENT_ID;
