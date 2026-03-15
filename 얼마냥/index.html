@@ -387,14 +387,23 @@ async function doSearch() {
       score: 0
     }));
 
-    naverRaw = filtered.map(i=>({
-      ...i,
-      platform:"naver",
-      shipping: estimateShipping(i),
-      unitInfo: calcUnit(i),
-      official: isOfficial(i),
-      score: calcScore(i, query, "naver")
-    }));
+    naverRaw = filtered.map(i=>{
+      // 네이버 상품의 링크가 쿠팡이면 내 추적링크로 교체
+      let link = i.link || i.productLink || "";
+      if (link.includes("coupang.com") || link.includes("lptag=") || link.includes("coupa.ng")) {
+        const t = strip(i.title).replace(/<[^>]*>/g,"").substring(0,30);
+        link = `https://link.coupang.com/a/${AF_ID}?q=${encodeURIComponent(t)}`;
+      }
+      return {
+        ...i,
+        link,
+        platform:"naver",
+        shipping: estimateShipping(i),
+        unitInfo: calcUnit(i),
+        official: isOfficial(i),
+        score: calcScore(i, query, "naver")
+      };
+    });
 
     // 쿠팡: 네이버 결과 기반 모의 (API 승인 대기) + 추적 링크 적용
     const coupangLink = data.coupangLink || `https://www.coupang.com/np/search?q=${encodeURIComponent(query)}`;
