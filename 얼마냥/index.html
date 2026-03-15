@@ -179,14 +179,53 @@ function showToast(msg){
 }
 
 // ─── 카테고리 감지 ───
-const ELECTRONICS_KW = ["에어팟","갤럭시","아이폰","iphone","airpods","맥북","노트북","삼성","lg","소니","tv","모니터","키보드","마우스","충전기","이어폰","헤드폰","스피커","카메라","프린터","태블릿","아이패드","워치","갤럭시워치","애플워치","다이슨","청소기","에어컨","냉장고","세탁기","건조기","전자레인지","공기청정기","가습기","제습기","전기밥솥","믹서기","블렌더"];
+const ELECTRONICS_KW = ["에어팟","갤럭시","아이폰","iphone","airpods","맥북","노트북","삼성","lg","소니","tv","모니터","키보드","마우스","충전기","이어폰","헤드폰","스피커","카메라","프린터","태블릿","아이패드","워치","갤럭시워치","애플워치","다이슨","청소기","에어컨","냉장고","세탁기","건조기","전자레인지","공기청정기","가습기","제습기","전기밥솥","믹서기","블렌더","로봇청소기"];
 const FOOD_KW = ["사료","캔","간식","츄르","파우치","건식","습식","고양이","강아지","반려","펫","세제","샴푸","린스","바디워시","기저귀","물티슈","분유","과자","라면","커피","차","음료","프로틴","보충제","비타민","마스크팩","선크림","크림","로션","에센스","오일","영양제","알약","캡슐"];
+
+// 악세사리 제외 키워드
+const ACCESSORY_KW = ["케이스","스티커","파우치","커버","보호필름","보호유리","강화유리","거치대","스킨","필름","액세서리","악세사리","스트랩","고리","클립","충전독","도크","스탠드","인형","피규어","파티션","가방","실리콘","범퍼","하드케이스","투명케이스","링홀더","홀더","크래들","포치","지갑","카드슬롯","자석","마그네틱","맥세이프","스크래치"];
+
+// 검색어에서 핵심 키워드 추출
+const STOP_WORDS = ["정품","공식","최저가","무료배송","당일배송","새상품","미개봉","리퍼","할인","특가","세일","이벤트","추천","인기","베스트","신상","최신","고급","프리미엄","국내","해외","직구","병행","정식","수입","블랙","화이트","실버","골드","그린","블루","레드","핑크","퍼플","옐로우","그레이","네이비","베이지","색상"];
+
+function extractCoreKw(query) {
+  const cleaned = query.toLowerCase().replace(/[^\w\s가-힣]/g,' ').replace(/\s+/g,' ').trim();
+  return cleaned.split(' ').filter(w => w.length >= 2 && !STOP_WORDS.some(s => s.toLowerCase() === w));
+}
 
 function detectCategory(query) {
   const q = query.toLowerCase();
   if (ELECTRONICS_KW.some(k => q.includes(k.toLowerCase()))) return "electronics";
   if (FOOD_KW.some(k => q.includes(k.toLowerCase()))) return "food";
   return "general";
+}
+
+// 어떤 검색어든 관련 본품만 필터링
+function filterRelevantItems(items, query, category) {
+  const coreKws = extractCoreKw(query);
+  if (coreKws.length === 0) return items;
+
+  // 1차: 핵심 키워드 최소 1개 이상 제목에 포함
+  let filtered = items.filter(item => {
+    const title = strip(item.title).toLowerCase();
+    return coreKws.some(k => title.includes(k));
+  });
+
+  // 2차: 전자제품/일반 카테고리면 악세사리 제거
+  if (category === "electronics" || category === "general") {
+    const noAccessory = filtered.filter(item => {
+      const title = strip(item.title).toLowerCase();
+      return !ACCESSORY_KW.some(k => title.includes(k));
+    });
+    // 악세사리 제거 후 5개 이상이면 적용
+    if (noAccessory.length >= 5) filtered = noAccessory;
+  }
+
+  // 최소 5개 보장: 너무 걸러지면 1차만 적용
+  return filtered.length >= 5 ? filtered : items.filter(item => {
+    const title = strip(item.title).toLowerCase();
+    return coreKws.some(k => title.includes(k));
+  });
 }
 
 // ─── 수량/단위 파싱 ───
@@ -244,8 +283,13 @@ async function doSearch() {
     const res = await fetch(`/.netlify/functions/search?query=${encodeURIComponent(query)}&sort=sim`);
     if (!res.ok) throw new Error("서버 오류 "+res.status);
     const data = await res.json();
+    let rawItems = data.items || [];
 
-    const naverItems = (data.items||[]).map(i=>({
+    // 카테고리 무관하게 스마트 필터링 적용
+    const smartFiltered = filterRelevantItems(rawItems, query, currentCategory);
+    rawItems = smartFiltered;
+
+    const naverItems = rawItems.map(i=>({
       ...i,
       platform:"naver",
       shipping: estimateShipping(i),
