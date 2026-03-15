@@ -1,6 +1,6 @@
 [build]
   publish = "얼마냥"
+  command = ""
 
 [functions]
-  directory = "netlify/functions"
-  node_bundler = "esbuild"
+  directory = "얼마냥/netlify/functions"
