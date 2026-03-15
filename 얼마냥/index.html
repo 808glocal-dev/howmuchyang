@@ -415,6 +415,30 @@ function calcScore(item, query, platform) {
 }
 
 // ─── 필터 탭 구성 ───
+let activeBrand = "전체";
+
+function buildBrandChips() {
+  const chips = document.getElementById("brandChips");
+  if (!chips) return;
+  // 브랜드 목록 추출
+  const brandSet = new Set();
+  [...naverRaw, ...coupangRaw].forEach(item => {
+    const b = item.brand || item.maker || "";
+    if (b && b.length > 1 && b.length < 15) brandSet.add(b);
+  });
+  const brands = ["전체", ...Array.from(brandSet).slice(0, 8)];
+  chips.innerHTML = brands.map(b =>
+    `<button class="brand-chip${b===activeBrand?" active":""}" onclick="filterByBrand('${b}')">${b}</button>`
+  ).join("");
+}
+
+function filterByBrand(brand) {
+  activeBrand = brand;
+  buildBrandChips();
+  displayedCount = 0;
+  renderList(currentFilter, true);
+}
+
 function buildFilterTabs() {
   const tabs = document.getElementById("filterTabs");
   let html = `
@@ -562,6 +586,10 @@ function getFiltered(filter) {
   if (filter === "coupang") return [...coupangRaw];
 
   let items = [...coupangRaw, ...naverRaw];
+  // 브랜드 필터
+  if (activeBrand && activeBrand !== "전체") {
+    items = items.filter(i => (i.brand||i.maker||"") === activeBrand);
+  }
 
   if (filter === "popular") {
     return [...coupangRaw, ...naverRaw];
@@ -703,49 +731,81 @@ function renderList(filter, reset) {
 function loadMore(){ renderList(currentFilter,false); }
 
 function makeCard(item, globalMin) {
-  const price=Number(item.lprice);
-  const isLowest=price===globalMin;
-  const id=(item.productId||item.title||"")+"_"+item.platform;
-  const isZzimed=zzimList.some(z=>z.id===id);
-  const mt=isLowest?"margin-top:8px":"";
-  const ui=item.unitInfo;
+  const price = Number(item.lprice);
+  const hprice = Number(item.hprice) || 0;
+  const isLowest = price === globalMin;
+  const id = (item.productId||item.title||"")+"_"+item.platform;
+  const isZzimed = zzimList.some(z=>z.id===id);
+  const ui = item.unitInfo;
+  const review = item.reviewCount ? Number(item.reviewCount) : 0;
+  const brand = item.brand || item.maker || item.mallName || "";
 
-  let tags="";
-  if(currentCategory==="food"&&ui){
-    tags+=`<span class="tag tag-unit">1${ui.unit}당 ${fmt(ui.unitPrice)}원</span>`;
-    if(ui.qty>=6||ui.qty>=400) tags+=`<span class="tag tag-bulk">묶음 ${ui.qty}${ui.unit}</span>`;
-  } else if(currentCategory==="electronics"&&item.official){
-    tags+=`<span class="tag tag-official">공식판매처</span>`;
-  }
-  tags+=item.shipping==="free"?`<span class="tag tag-free">무료배송</span>`:`<span class="tag tag-paid">배송비 있음</span>`;
-  if(isLowest) tags+=`<span class="tag tag-low">최저가</span>`;
+  // 할인율 계산 (hprice가 있을 때)
+  const discountRate = hprice > price ? Math.round((1 - price/hprice)*100) : 0;
 
-  const card=document.createElement("div");
-  card.className="product-card"+(isLowest?" is-lowest":"");
-  card.innerHTML=`
-    ${isLowest?'<div class="lowest-tag">🏆 최저가</div>':""}
-    ${item.image
-      ?`<img class="product-img" src="${item.image}" alt="" style="${mt}" onerror="this.outerHTML='<div class=product-img-ph style=${mt}>🛍️</div>'">`
-      :`<div class="product-img-ph" style="${mt}">🛍️</div>`}
-    <div class="product-info" style="${mt}">
+  // 플랫폼 배지
+  const platformBadge = item.platform === "coupang"
+    ? `<span style="background:#FEEE00;color:#333;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;">쿠팡</span>`
+    : `<span style="background:#03C75A;color:white;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;">N</span>`;
+
+  // 공식 뱃지
+  const officialBadge = item.official
+    ? `<span style="border:1px solid #03C75A;color:#03C75A;font-size:10px;padding:1px 5px;border-radius:3px;margin-left:4px;">공식</span>`
+    : "";
+
+  // 단가 표시
+  const unitText = (currentCategory==="food"&&ui)
+    ? `<div style="font-size:11px;color:#888;margin-top:2px;">100${ui.unit}당 ${fmt(Math.round(ui.unitPrice))}원</div>`
+    : "";
+
+  // 리뷰수
+  const reviewText = review > 0
+    ? `<span style="color:#666;font-size:11px;">⭐ ${review>=1000?(review/1000).toFixed(1)+"k":review}개 후기</span>`
+    : "";
+
+  // 배송
+  const delivText = item.shipping==="free"
+    ? `<span style="color:#03C75A;font-size:11px;font-weight:600;">무료배송</span>`
+    : `<span style="color:#888;font-size:11px;">배송비 별도</span>`;
+
+  // 최저가 표시
+  const lowestBadge = isLowest
+    ? `<span style="background:#FF6B6B;color:white;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;margin-right:4px;">최저가</span>`
+    : "";
+
+  const card = document.createElement("div");
+  card.className = "product-card" + (isLowest?" is-lowest":"");
+  card.innerHTML = `
+    <img class="product-img" src="${item.image||""}" alt="" onerror="this.outerHTML='<div class=product-img-ph>🛍️</div>'" />
+    <div class="product-info">
+      <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">
+        ${platformBadge}
+        ${officialBadge}
+        ${lowestBadge}
+      </div>
       <p class="product-title">${strip(item.title)}</p>
-      <p class="product-mall">${item.mallName||"쿠팡"} · ${item.platform==="naver"?"네이버쇼핑":"쿠팡"}</p>
-      <div class="product-tags">${tags}</div>
-      <div class="product-bottom">
-        <span class="product-price ${isLowest?"lowest":""}">${fmt(price)}<small>원</small></span>
-        <div class="product-actions">
-          <button class="btn-zzim ${isZzimed?"on":""}" data-id="${id}">${isZzimed?"❤️":"🤍"}</button>
-          <button class="btn-buy ${isLowest?"":"gray"}">구매하기</button>
-        </div>
+      ${brand ? `<p style="font-size:11px;color:#aaa;margin:2px 0 4px;">${brand}</p>` : ""}
+      <div style="margin:4px 0;">
+        ${discountRate>0?`<span style="color:#FF6B6B;font-weight:700;font-size:13px;margin-right:4px;">${discountRate}%</span>`:""}
+        <span class="product-price${isLowest?" lowest":""}">${fmt(price)}<small>원</small></span>
+      </div>
+      ${unitText}
+      <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+        ${reviewText}
+        ${delivText}
+      </div>
+      <div class="product-bottom" style="margin-top:8px;">
+        <button class="btn-zzim ${isZzimed?"on":""}" data-id="${id}">${isZzimed?"❤️":"🤍"}</button>
+        <button class="btn-buy${isLowest?"":" gray"}">구매하기</button>
       </div>
     </div>`;
 
   card.querySelector(".btn-zzim").addEventListener("click",e=>{
     e.stopPropagation();
     const btn=e.currentTarget;
-    const idx=zzimList.findIndex(z=>z.id===id);
-    if(idx===-1){zzimList.push({id,...item});btn.classList.add("on");btn.textContent="❤️";showToast("찜 목록에 추가했어요 ❤️");}
-    else{zzimList.splice(idx,1);btn.classList.remove("on");btn.textContent="🤍";showToast("찜 목록에서 제거했어요");}
+    const i=zzimList.findIndex(z=>z.id===id);
+    if(i===-1){zzimList.push({id,...item});btn.classList.add("on");btn.textContent="❤️";showToast("찜 목록에 추가했어요 ❤️");}
+    else{zzimList.splice(i,1);btn.classList.remove("on");btn.textContent="🤍";showToast("찜 목록에서 제거했어요");}
     localStorage.setItem("zzimList",JSON.stringify(zzimList));
     updateZzimCount();
   });
@@ -755,11 +815,11 @@ function makeCard(item, globalMin) {
     const url=item.link||item.productLink;
     if(url) window.open(url,"_blank");
   });
-  });
 
   card.addEventListener("click",()=>{ const url=item.link||item.productLink; if(url) window.open(url,"_blank"); });
   return card;
 }
+
 
 function updateZzimCount(){ document.getElementById("zzimCount").textContent=zzimList.length; }
 
