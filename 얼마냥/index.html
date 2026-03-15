@@ -395,12 +395,11 @@ async function doSearch() {
     // 쿠팡: 네이버 결과 기반 모의 (API 승인 대기) + 추적 링크 적용
     const coupangLink = data.coupangLink || `https://www.coupang.com/np/search?q=${encodeURIComponent(query)}`;
     window._coupangLink = coupangLink;
+    const afId = "d4YZ7m";
     coupangRaw = naverRaw.slice(0,8).map(item=>{
-      // 상품명으로 쿠팡 개별 검색 링크 생성 (추적코드 포함)
-      const productTitle = strip(item.title).substring(0, 30);
-      const itemLink = data.coupangLink
-        ? data.coupangLink.replace(encodeURIComponent(query), encodeURIComponent(productTitle))
-        : `https://www.coupang.com/np/search?q=${encodeURIComponent(productTitle)}`;
+      const productTitle = strip(item.title).replace(/<[^>]*>/g,"").substring(0,30);
+      // 무조건 내 추적링크로만 생성 - 네이버 원본 링크 절대 사용 안 함
+      const itemLink = `https://link.coupang.com/a/${afId}?q=${encodeURIComponent(productTitle)}`;
       return {
         ...item,
         platform:"coupang",
