@@ -1,6 +1,6 @@
 [build]
-  publish = "."
+  publish = "얼마냥"
   command = ""
 
 [functions]
-  directory = "netlify/functions"
+  directory = "얼마냥/netlify/functions"
