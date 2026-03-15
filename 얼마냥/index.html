@@ -392,15 +392,22 @@ async function doSearch() {
 
     // 쿠팡: 네이버 결과 기반 모의 (API 승인 대기) + 추적 링크 적용
     const coupangLink = data.coupangLink || `https://www.coupang.com/np/search?q=${encodeURIComponent(query)}`;
-    coupangRaw = naverRaw.slice(0,8).map(item=>({
-      ...item,
-      platform:"coupang",
-      lprice: Math.floor(Number(item.lprice)*(0.88+Math.random()*0.15)),
-      mallName:"쿠팡",
-      shipping:"free",
-      official:false,
-      link: coupangLink
-    })).map(i=>({...i, unitInfo:calcUnit(i), score:calcScore(i,query,"coupang")}));
+    coupangRaw = naverRaw.slice(0,8).map(item=>{
+      // 상품명으로 쿠팡 개별 검색 링크 생성 (추적코드 포함)
+      const productTitle = strip(item.title).substring(0, 30);
+      const itemLink = data.coupangLink
+        ? data.coupangLink.replace(encodeURIComponent(query), encodeURIComponent(productTitle))
+        : `https://www.coupang.com/np/search?q=${encodeURIComponent(productTitle)}`;
+      return {
+        ...item,
+        platform:"coupang",
+        lprice: Math.floor(Number(item.lprice)*(0.88+Math.random()*0.15)),
+        mallName:"쿠팡",
+        shipping:"free",
+        official:false,
+        link: itemLink
+      };
+    }).map(i=>({...i, unitInfo:calcUnit(i), score:calcScore(i,query,"coupang")}));
 
     // 기본: 인기순 (API 순서 = 관련도+판매량 기반)
     allItems = [...coupangRaw, ...naverRaw];
