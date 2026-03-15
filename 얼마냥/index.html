@@ -30,7 +30,7 @@
     .loading p{color:var(--primary);font-size:14px;font-weight:600;margin-top:10px;}
     @keyframes spin{to{transform:rotate(360deg);}}
     .error-box{margin:12px 0;padding:14px;background:#fff5f5;border:1px solid #ffcdd2;border-radius:12px;color:#c62828;font-size:13px;text-align:center;display:none;}
-    .ai-section{margin-bottom:14px;}
+    .ai-section{margin-bottom:14px;background:white;border-radius:14px;padding:12px;border:1px solid rgba(255,107,107,0.15);}
     .ai-section-title{font-size:12px;font-weight:700;color:var(--sub);margin-bottom:8px;padding:0 2px;}
     .ai-top-card{background:white;border-radius:12px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;cursor:pointer;transition:transform 0.15s;}
     .ai-top-card:active{transform:scale(0.98);}
@@ -164,7 +164,7 @@
 
   <div class="result-meta" id="resultMeta">
     <span><strong id="resultCountNum">0</strong>개 검색됨</span>
-    <span class="badge-low" id="lowestBadge"></span>
+    <span class="badge-low" id="lowestBadge" style="display:none"></span>
   </div>
 
   <div id="productList"></div>
@@ -593,6 +593,9 @@ function applyFilter(filter) {
   document.querySelectorAll(".ftab").forEach(t=>t.classList.remove("active"));
   const ft=document.getElementById("ftab-"+filter);
   if(ft) ft.classList.add("active");
+  // 가격순일 때만 최저가 배지 표시
+  const badge = document.getElementById("lowestBadge");
+  if(badge) badge.style.display = (filter==="price"||filter==="unit") ? "inline-block" : "none";
   displayedCount=0;
   renderList(filter,true);
 }
@@ -619,14 +622,14 @@ function renderList(filter, reset) {
     const coupangItems = toShow.filter(i=>i.platform==="coupang");
     if(naverItems.length){
       const d=document.createElement("div");
-      d.className="section-div"; d.textContent="🟢 네이버쇼핑";
+      d.className="section-div"; d.innerHTML="🔥 인기 상품 <span style='font-size:10px;color:#aaa;font-weight:400'>네이버쇼핑 · 판매 인기순</span>";
       list.appendChild(d);
       naverItems.forEach(item=>list.appendChild(makeCard(item,globalMin)));
     }
     if(coupangItems.length){
       const d=document.createElement("div");
       d.className="section-div";
-      d.innerHTML=`🟡 쿠팡 <span style="font-size:10px;color:#ffaa00">(API 연동 예정)</span>`;
+      d.innerHTML=`🟡 쿠팡 인기 상품 <span style="font-size:10px;color:#ffaa00">(API 연동 예정)</span>`;
       list.appendChild(d);
       coupangItems.forEach(item=>list.appendChild(makeCard(item,globalMin)));
     }
