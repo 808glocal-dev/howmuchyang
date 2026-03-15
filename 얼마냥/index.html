@@ -76,7 +76,8 @@
     .tag-paid{background:#fff8f0;color:#854F0B;}
     .tag-bulk{background:#f5f0ff;color:#5E35B1;}
     .tag-official{background:#e8f4fd;color:#185FA5;}
-    .tag-model{background:#f0f0ff;color:#3949AB;}
+    .tag-low{background:#fff0f0;color:#FF6B6B;}
+    .tag-popular{background:#f0f8ff;color:#185FA5;}
     .product-bottom{display:flex;align-items:center;justify-content:space-between;}
     .product-price{font-size:17px;font-weight:900;color:var(--text);}
     .product-price.lowest{color:var(--primary);}
@@ -100,10 +101,8 @@
     .zzim-content{padding:12px;}
     .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#333;color:white;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:500;opacity:0;transition:all 0.3s;z-index:300;white-space:nowrap;}
     .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
-    .cat-badge{display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;margin-bottom:10px;}
-    .cat-electronics{background:#e8f4fd;color:#185FA5;}
-    .cat-food{background:#f0fff4;color:#3B6D11;}
-    .cat-general{background:#f5f5f5;color:#666;}
+    .section-div{font-size:11px;font-weight:700;color:var(--sub);padding:8px 2px 4px;display:flex;align-items:center;gap:6px;}
+    .section-div::after{content:'';flex:1;height:1px;background:var(--border);}
   </style>
 </head>
 <body>
@@ -114,7 +113,7 @@
     <button class="zzim-btn" onclick="openZzim()">❤️ 찜 <span class="zzim-count" id="zzimCount">0</span></button>
   </div>
   <div class="search-box">
-    <input type="text" id="searchInput" placeholder="상품 검색... 예) 에어팟, 고양이 사료"/>
+    <input type="text" id="searchInput" placeholder="상품 검색... 예) 에어팟 프로, 고양이 사료"/>
     <button class="btn-search" id="searchBtn" onclick="doSearch()">🔍 검색</button>
   </div>
 </div>
@@ -137,7 +136,7 @@
   </div>
 
   <div class="result-meta" id="resultMeta">
-    <span><strong id="resultCountNum">0</strong>개 검색됨 <span id="catBadge"></span></span>
+    <span><strong id="resultCountNum">0</strong>개 검색됨</span>
     <span class="badge-low" id="lowestBadge"></span>
   </div>
 
@@ -160,17 +159,20 @@
 <div class="toast" id="toast"></div>
 
 <script>
-let allItems = [];
+let allItems = [];       // 원본 (필터링 완료)
+let naverRaw = [];       // 네이버 원본
+let coupangRaw = [];     // 쿠팡 원본
 let displayedCount = 0;
 const PAGE_SIZE = 15;
 let currentFilter = "popular";
 let currentCategory = "general";
+let currentQuery = "";
 let zzimList = JSON.parse(localStorage.getItem("zzimList") || "[]");
 
 updateZzimCount();
 document.getElementById("searchInput").addEventListener("keydown", e => { if(e.key==="Enter") doSearch(); });
 
-function strip(h){ return h.replace(/<[^>]*>/g,""); }
+function strip(h){ return h ? h.replace(/<[^>]*>/g,"") : ""; }
 function fmt(n){ return Number(n).toLocaleString("ko-KR"); }
 function showToast(msg){
   const t=document.getElementById("toast");
@@ -179,19 +181,28 @@ function showToast(msg){
 }
 
 // ─── 카테고리 감지 ───
-const ELECTRONICS_KW = ["에어팟","갤럭시","아이폰","iphone","airpods","맥북","노트북","삼성","lg","소니","tv","모니터","키보드","마우스","충전기","이어폰","헤드폰","스피커","카메라","프린터","태블릿","아이패드","워치","갤럭시워치","애플워치","다이슨","청소기","에어컨","냉장고","세탁기","건조기","전자레인지","공기청정기","가습기","제습기","전기밥솥","믹서기","블렌더","로봇청소기"];
-const FOOD_KW = ["사료","캔","간식","츄르","파우치","건식","습식","고양이","강아지","반려","펫","세제","샴푸","린스","바디워시","기저귀","물티슈","분유","과자","라면","커피","차","음료","프로틴","보충제","비타민","마스크팩","선크림","크림","로션","에센스","오일","영양제","알약","캡슐"];
+const ELECTRONICS_KW = ["에어팟","갤럭시","아이폰","iphone","airpods","맥북","노트북","삼성","lg","소니","tv","모니터","키보드","마우스","이어폰","헤드폰","스피커","카메라","프린터","태블릿","아이패드","워치","다이슨","청소기","에어컨","냉장고","세탁기","건조기","전자레인지","공기청정기","가습기","제습기","전기밥솥","로봇청소기","인덕션","오븐","전동칫솔","드라이기","고데기"];
+const FOOD_KW = ["사료","캔","간식","츄르","파우치","건식","습식","세제","샴푸","린스","바디워시","기저귀","물티슈","분유","과자","라면","커피","음료","프로틴","보충제","비타민","선크림","크림","로션","에센스","오일","영양제","캡슐","고양이","강아지","반려","펫"];
 
+// 현실적 가격 최솟값 (이 이하면 증정품/짝퉁 의심)
+const PRICE_FLOOR = {
+  "에어팟": 80000, "airpods": 80000,
+  "갤럭시": 200000, "아이폰": 300000, "iphone": 300000,
+  "맥북": 800000, "노트북": 300000,
+  "아이패드": 400000, "태블릿": 100000,
+  "애플워치": 200000, "갤럭시워치": 150000,
+  "다이슨": 150000, "로봇청소기": 150000,
+  "에어컨": 300000, "냉장고": 300000, "세탁기": 300000,
+  "tv": 200000, "모니터": 80000,
+  "이어폰": 10000, "헤드폰": 20000,
+};
+
+// 증정/사은품 제외 키워드
+const GIFT_KW = ["증정","사은품","사은","랜덤발송","랜덤 발송","선물포장","리본포장","쇼핑백","이벤트상품","증정품","경품","공짜","무료증정"];
 // 악세사리 제외 키워드
-const ACCESSORY_KW = ["케이스","스티커","파우치","커버","보호필름","보호유리","강화유리","거치대","스킨","필름","액세서리","악세사리","스트랩","고리","클립","충전독","도크","스탠드","인형","피규어","파티션","가방","실리콘","범퍼","하드케이스","투명케이스","링홀더","홀더","크래들","포치","지갑","카드슬롯","자석","마그네틱","맥세이프","스크래치"];
-
-// 검색어에서 핵심 키워드 추출
-const STOP_WORDS = ["정품","공식","최저가","무료배송","당일배송","새상품","미개봉","리퍼","할인","특가","세일","이벤트","추천","인기","베스트","신상","최신","고급","프리미엄","국내","해외","직구","병행","정식","수입","블랙","화이트","실버","골드","그린","블루","레드","핑크","퍼플","옐로우","그레이","네이비","베이지","색상"];
-
-function extractCoreKw(query) {
-  const cleaned = query.toLowerCase().replace(/[^\w\s가-힣]/g,' ').replace(/\s+/g,' ').trim();
-  return cleaned.split(' ').filter(w => w.length >= 2 && !STOP_WORDS.some(s => s.toLowerCase() === w));
-}
+const ACCESSORY_KW = ["케이스","스티커","파우치","커버","보호필름","강화유리","거치대","스킨","필름","액세서리","악세사리","스트랩","고리","클립","충전독","도크","스탠드","인형","피규어","실리콘","범퍼","홀더","크래들","지갑","카드","자석","맥세이프","링","그립"];
+// 불용어
+const STOP_WORDS = ["정품","공식","최저가","무료배송","당일","새상품","미개봉","리퍼","할인","특가","세일","이벤트","추천","인기","베스트","신상","최신","고급","프리미엄","국내","해외","직구","블랙","화이트","실버","골드","그린","블루","레드","핑크","퍼플","그레이","네이비","색상","세대","버전","에디션"];
 
 function detectCategory(query) {
   const q = query.toLowerCase();
@@ -200,54 +211,73 @@ function detectCategory(query) {
   return "general";
 }
 
-// 어떤 검색어든 관련 본품만 필터링
-function filterRelevantItems(items, query, category) {
-  const coreKws = extractCoreKw(query);
-  if (coreKws.length === 0) return items;
-
-  // 1차: 핵심 키워드 최소 1개 이상 제목에 포함
-  let filtered = items.filter(item => {
-    const title = strip(item.title).toLowerCase();
-    return coreKws.some(k => title.includes(k));
-  });
-
-  // 2차: 전자제품/일반 카테고리면 악세사리 제거
-  if (category === "electronics" || category === "general") {
-    const noAccessory = filtered.filter(item => {
-      const title = strip(item.title).toLowerCase();
-      return !ACCESSORY_KW.some(k => title.includes(k));
-    });
-    // 악세사리 제거 후 5개 이상이면 적용
-    if (noAccessory.length >= 5) filtered = noAccessory;
+function getPriceFloor(query) {
+  const q = query.toLowerCase();
+  for (const [k, v] of Object.entries(PRICE_FLOOR)) {
+    if (q.includes(k.toLowerCase())) return v;
   }
-
-  // 최소 5개 보장: 너무 걸러지면 1차만 적용
-  return filtered.length >= 5 ? filtered : items.filter(item => {
-    const title = strip(item.title).toLowerCase();
-    return coreKws.some(k => title.includes(k));
-  });
+  return 0;
 }
 
-// ─── 수량/단위 파싱 ───
-function parseQty(title) {
-  const t = strip(title).toLowerCase();
-  const kgM = t.match(/(\d+(?:\.\d+)?)\s*kg/);
-  if (kgM) return { qty: parseFloat(kgM[1])*1000, unit:"g", type:"weight" };
-  const gM = t.match(/(\d+)\s*g\b/);
-  if (gM && parseInt(gM[1])>30) return { qty: parseInt(gM[1]), unit:"g", type:"weight" };
-  const mlM = t.match(/(\d+)\s*ml/);
-  if (mlM && parseInt(mlM[1])>30) return { qty: parseInt(mlM[1]), unit:"ml", type:"volume" };
-  const lM = t.match(/(\d+(?:\.\d+)?)\s*l\b/);
-  if (lM) return { qty: parseFloat(lM[1])*1000, unit:"ml", type:"volume" };
-  const cntM = t.match(/(\d+)\s*(개입|캔|팩|개|인분|봉|정|알)/);
-  if (cntM && parseInt(cntM[1])>1) return { qty: parseInt(cntM[1]), unit:cntM[2], type:"count" };
-  return null;
+function extractCoreKw(query) {
+  const cleaned = query.toLowerCase().replace(/[^\w\s가-힣]/g,' ').replace(/\s+/g,' ').trim();
+  return cleaned.split(' ').filter(w => w.length >= 2 && !STOP_WORDS.some(s => s.toLowerCase() === w));
+}
+
+// ─── 스마트 필터링 ───
+function smartFilter(items, query, category) {
+  const coreKws = extractCoreKw(query);
+  const priceFloor = getPriceFloor(query);
+
+  let result = items.filter(item => {
+    const title = strip(item.title).toLowerCase();
+    const price = Number(item.lprice);
+
+    // 1. 핵심 키워드 포함 여부
+    if (coreKws.length > 0 && !coreKws.some(k => title.includes(k))) return false;
+
+    // 2. 가격 최솟값 (증정품/짝퉁 제거)
+    if (priceFloor > 0 && price < priceFloor) return false;
+
+    // 3. 증정/사은품 제거
+    if (GIFT_KW.some(k => title.includes(k))) return false;
+
+    // 4. 전자제품/일반은 악세사리 제거
+    if (category === "electronics" || category === "general") {
+      if (ACCESSORY_KW.some(k => title.includes(k))) return false;
+    }
+
+    return true;
+  });
+
+  // 너무 걸러지면 단계적 완화
+  if (result.length < 5) {
+    result = items.filter(item => {
+      const title = strip(item.title).toLowerCase();
+      const price = Number(item.lprice);
+      if (coreKws.length > 0 && !coreKws.some(k => title.includes(k))) return false;
+      if (priceFloor > 0 && price < priceFloor) return false;
+      if (GIFT_KW.some(k => title.includes(k))) return false;
+      return true;
+    });
+  }
+
+  return result.length >= 3 ? result : items;
 }
 
 function calcUnit(item) {
-  const q = parseQty(item.title);
-  if (!q) return null;
-  return { ...q, unitPrice: Math.round(Number(item.lprice)/q.qty) };
+  const t = strip(item.title).toLowerCase();
+  const kgM = t.match(/(\d+(?:\.\d+)?)\s*kg/);
+  if (kgM) return { qty: parseFloat(kgM[1])*1000, unit:"g", unitPrice: Math.round(Number(item.lprice)/(parseFloat(kgM[1])*1000)) };
+  const gM = t.match(/(\d+)\s*g\b/);
+  if (gM && parseInt(gM[1])>30) return { qty: parseInt(gM[1]), unit:"g", unitPrice: Math.round(Number(item.lprice)/parseInt(gM[1])) };
+  const mlM = t.match(/(\d+)\s*ml/);
+  if (mlM && parseInt(mlM[1])>30) return { qty: parseInt(mlM[1]), unit:"ml", unitPrice: Math.round(Number(item.lprice)/parseInt(mlM[1])) };
+  const lM = t.match(/(\d+(?:\.\d+)?)\s*l\b/);
+  if (lM) return { qty: parseFloat(lM[1])*1000, unit:"ml", unitPrice: Math.round(Number(item.lprice)/(parseFloat(lM[1])*1000)) };
+  const cntM = t.match(/(\d+)\s*(개입|캔|팩|봉|정|알)/);
+  if (cntM && parseInt(cntM[1])>1) return { qty: parseInt(cntM[1]), unit:cntM[2], unitPrice: Math.round(Number(item.lprice)/parseInt(cntM[1])) };
+  return null;
 }
 
 function estimateShipping(item) {
@@ -260,7 +290,7 @@ function estimateShipping(item) {
 
 function isOfficial(item) {
   const m = (item.mallName||"").toLowerCase();
-  return m.includes("공식") || m.includes("direct") || m.includes("official") || m.includes("스토어");
+  return m.includes("공식") || m.includes("direct") || m.includes("official") || m.includes("스토어") || m.includes("브랜드");
 }
 
 // ─── 검색 ───
@@ -268,6 +298,7 @@ async function doSearch() {
   const query = document.getElementById("searchInput").value.trim();
   if (!query) return;
 
+  currentQuery = query;
   currentCategory = detectCategory(query);
 
   ["emptyState","noResult","errorBox"].forEach(id=>document.getElementById(id).style.display="none");
@@ -283,21 +314,23 @@ async function doSearch() {
     const res = await fetch(`/.netlify/functions/search?query=${encodeURIComponent(query)}&sort=sim`);
     if (!res.ok) throw new Error("서버 오류 "+res.status);
     const data = await res.json();
-    let rawItems = data.items || [];
 
-    // 카테고리 무관하게 스마트 필터링 적용
-    const smartFiltered = filterRelevantItems(rawItems, query, currentCategory);
-    rawItems = smartFiltered;
+    const rawItems = data.items || [];
 
-    const naverItems = rawItems.map(i=>({
+    // 스마트 필터링
+    const filtered = smartFilter(rawItems, query, currentCategory);
+
+    naverRaw = filtered.map(i=>({
       ...i,
       platform:"naver",
       shipping: estimateShipping(i),
       unitInfo: calcUnit(i),
-      official: isOfficial(i)
+      official: isOfficial(i),
+      score: calcScore(i, query, "naver")
     }));
 
-    const coupangItems = naverItems.slice(0,6).map(item=>({
+    // 쿠팡: 네이버 결과 기반 모의 (API 승인 대기)
+    coupangRaw = naverRaw.slice(0,8).map(item=>({
       ...item,
       platform:"coupang",
       lprice: Math.floor(Number(item.lprice)*(0.88+Math.random()*0.15)),
@@ -305,17 +338,13 @@ async function doSearch() {
       shipping:"free",
       official:false,
       link:`https://www.coupang.com/np/search?q=${encodeURIComponent(query)}`
-    })).map(i=>({...i, unitInfo:calcUnit(i)}));
+    })).map(i=>({...i, unitInfo:calcUnit(i), score:calcScore(i,query,"coupang")}));
 
-    allItems = [...naverItems, ...coupangItems];
-    displayedCount = 0;
+    // 기본: 인기순 (API 순서 = 관련도+판매량 기반)
+    allItems = [...naverRaw, ...coupangRaw];
+    currentFilter = "popular";
 
     buildFilterTabs();
-    currentFilter = "popular";
-    document.querySelectorAll(".ftab").forEach(t=>t.classList.remove("active"));
-    const ft = document.getElementById("ftab-popular");
-    if(ft) ft.classList.add("active");
-
     renderAll();
   } catch(e) {
     document.getElementById("errorBox").textContent="검색 오류 😿 ("+e.message+")";
@@ -326,88 +355,113 @@ async function doSearch() {
   }
 }
 
-// ─── 카테고리별 탭 구성 ───
+// ─── 상품 신뢰도 점수 ───
+function calcScore(item, query, platform) {
+  let score = 0;
+  const price = Number(item.lprice);
+  const title = strip(item.title).toLowerCase();
+
+  // 인기 순서 점수 (앞일수록 높음 - API 순서가 판매량 기반)
+  // 기본 점수는 렌더링 순서로 결정됨
+
+  // 무료배송 보너스
+  if (item.shipping === "free") score += 10;
+
+  // 공식판매처 보너스
+  if (item.official) score += 15;
+
+  // 가격이 너무 낮으면 감점 (증정/짝퉁 의심)
+  const floor = getPriceFloor(query);
+  if (floor > 0 && price < floor * 1.2) score -= 20;
+
+  return score;
+}
+
+// ─── 필터 탭 구성 ───
 function buildFilterTabs() {
   const tabs = document.getElementById("filterTabs");
-  let html = `<button class="ftab" onclick="applyFilter('popular')" id="ftab-popular">🔥 인기순</button>
+  let html = `
+    <button class="ftab active" onclick="applyFilter('popular')" id="ftab-popular">🔥 인기순</button>
     <button class="ftab" onclick="applyFilter('price')" id="ftab-price">💰 가격순</button>
     <button class="ftab" onclick="applyFilter('free')" id="ftab-free">🚚 무료배송</button>`;
 
   if (currentCategory === "food") {
-    html += `<button class="ftab" onclick="applyFilter('unit')" id="ftab-unit">⚖️ 단가순</button>
+    html += `
+      <button class="ftab" onclick="applyFilter('unit')" id="ftab-unit">⚖️ 단가순</button>
       <button class="ftab" onclick="applyFilter('bulk')" id="ftab-bulk">📦 묶음최저</button>`;
   } else if (currentCategory === "electronics") {
     html += `<button class="ftab" onclick="applyFilter('official')" id="ftab-official">🏪 공식판매처</button>`;
   }
 
-  html += `<button class="ftab" onclick="applyFilter('naver')" id="ftab-naver">🟢 네이버</button>
+  html += `
+    <button class="ftab" onclick="applyFilter('naver')" id="ftab-naver">🟢 네이버</button>
     <button class="ftab" onclick="applyFilter('coupang')" id="ftab-coupang">🟡 쿠팡</button>`;
 
   tabs.innerHTML = html;
-  document.getElementById("filterWrap").style.display="block";
+  document.getElementById("filterWrap").style.display = "block";
 }
 
 function renderAll() {
   if (allItems.length===0){ document.getElementById("noResult").style.display="block"; return; }
 
-  const globalMin = Math.min(...allItems.map(i=>Number(i.lprice)).filter(Boolean));
+  const prices = allItems.map(i=>Number(i.lprice)).filter(Boolean);
+  const globalMin = Math.min(...prices);
+
   document.getElementById("resultCountNum").textContent = allItems.length;
   document.getElementById("lowestBadge").textContent = "최저 "+fmt(globalMin)+"원";
-
-  // 카테고리 뱃지
-  const catMap = { electronics:"📱 전자제품", food:"🐾 식품/소모품", general:"🛍️ 일반" };
-  const catColorMap = { electronics:"cat-electronics", food:"cat-food", general:"cat-general" };
-  document.getElementById("catBadge").innerHTML = `<span class="cat-badge ${catColorMap[currentCategory]}">${catMap[currentCategory]}</span>`;
-  document.getElementById("resultMeta").style.display="flex";
+  document.getElementById("resultMeta").style.display = "flex";
 
   renderAI();
-  displayedCount=0;
-  renderList(currentFilter, true);
+  displayedCount = 0;
+  renderList("popular", true);
 }
 
 // ─── AI 추천 (카테고리별) ───
 function renderAI() {
+  // 인기순(API 순서) 기준으로 후보 선정
+  const naverSorted = [...naverRaw]; // API 인기순 유지
   let candidates = [];
   let labels = [];
   let reasons = [];
 
   if (currentCategory === "electronics") {
-    const byPrice = [...allItems].sort((a,b)=>Number(a.lprice)-Number(b.lprice));
-    const cheapest = byPrice[0];
-    const freeShip = byPrice.find(i=>i.shipping==="free") || byPrice[1];
-    const official = allItems.find(i=>i.official) || byPrice[2] || byPrice[1];
+    const cheapest = [...naverSorted].sort((a,b)=>Number(a.lprice)-Number(b.lprice))[0];
+    const freeShip = naverSorted.find(i=>i.shipping==="free") || naverSorted[0];
+    const official = naverSorted.find(i=>i.official) || naverSorted[1] || naverSorted[0];
 
     candidates = [cheapest, freeShip, official].filter(Boolean);
-    labels = ["최저가", "무료배송 포함 최저", "공식/신뢰 판매처"];
+    labels = ["💰 최저가", "🚚 무료배송 포함 최저", "🏪 공식/신뢰 판매처"];
     reasons = [
-      `${fmt(Number(cheapest?.lprice))}원으로 전체 검색 결과 중 가장 저렴해요.`,
-      `${freeShip?.shipping==="free"?"배송비 없이":""}  ${fmt(Number(freeShip?.lprice))}원. 배송비 포함 실제 부담이 낮아요.`,
-      `공식 또는 신뢰도 높은 판매처에서 구매해 A/S 걱정을 줄일 수 있어요.`
+      `${fmt(Number(cheapest?.lprice))}원으로 검색 결과 중 가장 저렴해요. 가격만 보면 이게 최선이에요.`,
+      `배송비 없이 ${fmt(Number(freeShip?.lprice))}원. 배송비 포함 실제 부담 비용이 낮아요.`,
+      `공식 또는 신뢰도 높은 판매처. 가격이 조금 높더라도 A/S와 정품 보장이 확실해요.`
     ];
   } else if (currentCategory === "food") {
-    const withUnit = allItems.filter(i=>i.unitInfo);
+    const withUnit = naverSorted.filter(i=>i.unitInfo);
     const byUnit = [...withUnit].sort((a,b)=>a.unitInfo.unitPrice-b.unitInfo.unitPrice);
-    const bulkBest = byUnit.find(i=>i.unitInfo.qty>=6||i.unitInfo.qty>=500);
-    const singleBest = [...allItems].sort((a,b)=>Number(a.lprice)-Number(b.lprice))[0];
-    const midBest = byUnit.find(i=>i!==bulkBest&&i!==singleBest) || byUnit[1];
+    const bulkBest = byUnit.find(i=>i.unitInfo.qty>=6||i.unitInfo.qty>=400);
+    const unitBest = byUnit[0];
+    const priceBest = [...naverSorted].sort((a,b)=>Number(a.lprice)-Number(b.lprice))[0];
 
-    candidates = [bulkBest||singleBest, midBest||byUnit[0], singleBest].filter(Boolean);
-    labels = ["묶음 단가 최저", "중간 용량 추천", "낱개/소량 최저"];
+    candidates = [bulkBest||unitBest||priceBest, byUnit[1]||naverSorted[1], priceBest].filter(Boolean);
+    labels = ["📦 묶음 단가 최저", "⚖️ 중간 용량 추천", "💰 소량 최저가"];
     reasons = [
-      candidates[0]?.unitInfo ? `1${candidates[0].unitInfo.unit}당 ${fmt(candidates[0].unitInfo.unitPrice)}원으로 묶음 기준 단가가 가장 저렴해요.` : "가성비 최고 상품이에요.",
-      candidates[1]?.unitInfo ? `${candidates[1].unitInfo.qty}${candidates[1].unitInfo.unit} 구성으로 부담 없이 시작하기 좋아요.` : "중간 가격대로 합리적인 선택이에요.",
-      `${fmt(Number(candidates[2]?.lprice))}원으로 처음 시도해보거나 소량 필요할 때 추천해요.`
+      candidates[0]?.unitInfo ? `1${candidates[0].unitInfo.unit}당 ${fmt(candidates[0].unitInfo.unitPrice)}원으로 묶음 기준 단가가 가장 저렴해요. 장기 급여 시 최고 선택.` : "가성비 최고 상품이에요.",
+      candidates[1]?.unitInfo ? `${candidates[1].unitInfo.qty}${candidates[1].unitInfo.unit} 구성. 부담 없이 시작하기 좋고 단가도 합리적이에요.` : "중간 가격대로 균형 잡힌 선택이에요.",
+      `${fmt(Number(candidates[2]?.lprice))}원. 처음 시도해보거나 소량 필요할 때 부담 없이 구매하기 좋아요.`
     ];
   } else {
-    const byPrice = [...allItems].sort((a,b)=>Number(a.lprice)-Number(b.lprice));
-    candidates = byPrice.slice(0,3);
-    labels = ["최저가", "무료배송 최저", "인기 상품"];
-    const freeIdx = allItems.findIndex(i=>i.shipping==="free");
-    if(freeIdx>-1) candidates[1] = allItems[freeIdx];
+    const byPrice = [...naverSorted].sort((a,b)=>Number(a.lprice)-Number(b.lprice));
+    const cheapest = byPrice[0];
+    const freeShip = naverSorted.find(i=>i.shipping==="free") || byPrice[1];
+    const popular = naverSorted[0]; // API 인기 1위
+
+    candidates = [cheapest, freeShip, popular].filter(Boolean);
+    labels = ["💰 최저가", "🚚 무료배송 최저", "🔥 인기 1위"];
     reasons = [
-      `전체 결과 중 가장 저렴한 ${fmt(Number(candidates[0]?.lprice))}원이에요.`,
-      `무료배송 조건 포함 실제 부담 비용이 가장 낮아요.`,
-      `인기도와 가격을 함께 고려한 균형 잡힌 선택이에요.`
+      `${fmt(Number(cheapest?.lprice))}원으로 전체 결과 중 가장 저렴해요.`,
+      `무료배송 조건에서 가장 저렴한 ${fmt(Number(freeShip?.lprice))}원이에요.`,
+      `네이버 쇼핑 인기 1위 상품. 많은 사람이 선택한 검증된 상품이에요.`
     ];
   }
 
@@ -420,7 +474,7 @@ function renderAI() {
     seen.add(k); return true;
   }).slice(0,3);
   while(candidates.length<3){
-    const extra = allItems.find(i=>!candidates.includes(i));
+    const extra = naverRaw.find(i=>!candidates.includes(i));
     if(extra) candidates.push(extra); else break;
   }
 
@@ -433,13 +487,7 @@ function renderAI() {
     const price=Number(item.lprice);
     const ui=item.unitInfo;
     const ship=item.shipping==="free"?"무료배송":"배송비 있음";
-    const label = labels[i] || "";
-    const descParts = [
-      label,
-      ui&&currentCategory==="food"?`1${ui.unit}당 ${fmt(ui.unitPrice)}원`:null,
-      ship,
-      item.platform==="naver"?"네이버":"쿠팡"
-    ].filter(Boolean);
+    const descParts=[labels[i], ui&&currentCategory==="food"?`1${ui.unit}당 ${fmt(ui.unitPrice)}원`:null, ship].filter(Boolean);
 
     const card=document.createElement("div");
     card.className=`ai-top-card ${cardCls[i]}`;
@@ -447,7 +495,7 @@ function renderAI() {
       <div class="ai-top-left">
         <div class="rank-badge ${ranks[i]}">${i+1}</div>
         <div class="ai-info">
-          <div class="ai-name">${strip(item.title).substring(0,24)}...</div>
+          <div class="ai-name">${strip(item.title).substring(0,26)}</div>
           <div class="ai-desc">${descParts.join(" · ")}</div>
         </div>
       </div>
@@ -464,26 +512,32 @@ function renderAI() {
   candidates.forEach((item,i)=>{
     const el=document.createElement("div");
     el.className="reason-item";
-    el.innerHTML=`<div class="reason-num ${ranks[i]}">${i+1}</div><div class="reason-text">${strip(item.title).substring(0,18)}... — ${reasons[i]||""}</div>`;
+    el.innerHTML=`<div class="reason-num ${ranks[i]}">${i+1}</div><div class="reason-text"><strong>${strip(item.title).substring(0,20)}</strong> — ${reasons[i]||""}</div>`;
     reasonList.appendChild(el);
   });
 
-  document.getElementById("aiTitle").textContent = currentCategory==="electronics"?"🤖 AI 추천 TOP 3 (전자제품)":currentCategory==="food"?"🤖 AI 추천 TOP 3 (식품/소모품)":"🤖 AI 추천 TOP 3";
+  const catLabel = currentCategory==="electronics"?"📱 전자제품":currentCategory==="food"?"🐾 식품/소모품":"🛍️ 일반";
+  document.getElementById("aiTitle").textContent = `🤖 AI 추천 TOP 3 · ${catLabel}`;
   document.getElementById("aiSection").style.display="block";
   document.getElementById("aiReason").style.display="block";
 }
 
 // ─── 필터 적용 ───
 function getFiltered(filter) {
-  let items=[...allItems];
-  if(filter==="popular") return items;
-  if(filter==="price") return items.sort((a,b)=>Number(a.lprice)-Number(b.lprice));
-  if(filter==="free") return items.filter(i=>i.shipping==="free").sort((a,b)=>Number(a.lprice)-Number(b.lprice));
-  if(filter==="unit") return items.filter(i=>i.unitInfo).sort((a,b)=>a.unitInfo.unitPrice-b.unitInfo.unitPrice);
-  if(filter==="bulk") return items.filter(i=>i.unitInfo&&(i.unitInfo.qty>=6||i.unitInfo.qty>=500)).sort((a,b)=>a.unitInfo.unitPrice-b.unitInfo.unitPrice);
-  if(filter==="official") return items.filter(i=>i.official).concat(items.filter(i=>!i.official));
-  if(filter==="naver") return items.filter(i=>i.platform==="naver");
-  if(filter==="coupang") return items.filter(i=>i.platform==="coupang");
+  if (filter === "naver") return [...naverRaw];
+  if (filter === "coupang") return [...coupangRaw];
+
+  let items = [...naverRaw, ...coupangRaw];
+
+  if (filter === "popular") {
+    // 네이버 인기순(API 순서) + 쿠팡 분리
+    return [...naverRaw, ...coupangRaw];
+  }
+  if (filter === "price") return items.sort((a,b)=>Number(a.lprice)-Number(b.lprice));
+  if (filter === "free") return items.filter(i=>i.shipping==="free").sort((a,b)=>Number(a.lprice)-Number(b.lprice));
+  if (filter === "unit") return items.filter(i=>i.unitInfo).sort((a,b)=>a.unitInfo.unitPrice-b.unitInfo.unitPrice);
+  if (filter === "bulk") return items.filter(i=>i.unitInfo&&(i.unitInfo.qty>=6||i.unitInfo.qty>=400)).sort((a,b)=>a.unitInfo.unitPrice-b.unitInfo.unitPrice);
+  if (filter === "official") return [...items.filter(i=>i.official), ...items.filter(i=>!i.official)];
   return items;
 }
 
@@ -507,10 +561,31 @@ function renderList(filter, reset) {
     return;
   }
 
-  const globalMin=Math.min(...allItems.map(i=>Number(i.lprice)).filter(Boolean));
+  const prices = allItems.map(i=>Number(i.lprice)).filter(Boolean);
+  const globalMin = Math.min(...prices);
   const toShow=filtered.slice(displayedCount, displayedCount+PAGE_SIZE);
   displayedCount+=toShow.length;
-  toShow.forEach(item=>list.appendChild(makeCard(item,globalMin)));
+
+  // 인기순/전체는 플랫폼 섹션 구분
+  if ((filter==="popular"||filter==="price"||filter==="free") && reset) {
+    const naverItems = toShow.filter(i=>i.platform==="naver");
+    const coupangItems = toShow.filter(i=>i.platform==="coupang");
+    if(naverItems.length){
+      const d=document.createElement("div");
+      d.className="section-div"; d.textContent="🟢 네이버쇼핑";
+      list.appendChild(d);
+      naverItems.forEach(item=>list.appendChild(makeCard(item,globalMin)));
+    }
+    if(coupangItems.length){
+      const d=document.createElement("div");
+      d.className="section-div";
+      d.innerHTML=`🟡 쿠팡 <span style="font-size:10px;color:#ffaa00">(API 연동 예정)</span>`;
+      list.appendChild(d);
+      coupangItems.forEach(item=>list.appendChild(makeCard(item,globalMin)));
+    }
+  } else {
+    toShow.forEach(item=>list.appendChild(makeCard(item,globalMin)));
+  }
 
   const btn=document.getElementById("loadMoreBtn");
   btn.style.display=displayedCount<filtered.length?"block":"none";
@@ -527,20 +602,18 @@ function makeCard(item, globalMin) {
   const mt=isLowest?"margin-top:8px":"";
   const ui=item.unitInfo;
 
-  const card=document.createElement("div");
-  card.className="product-card"+(isLowest?" is-lowest":"");
-
-  // 카테고리별 태그 생성
   let tags="";
   if(currentCategory==="food"&&ui){
     tags+=`<span class="tag tag-unit">1${ui.unit}당 ${fmt(ui.unitPrice)}원</span>`;
-    if(ui.qty>=6||ui.qty>=500) tags+=`<span class="tag tag-bulk">묶음 ${ui.qty}${ui.unit}</span>`;
-  } else if(currentCategory==="electronics"){
-    if(item.official) tags+=`<span class="tag tag-official">공식판매처</span>`;
+    if(ui.qty>=6||ui.qty>=400) tags+=`<span class="tag tag-bulk">묶음 ${ui.qty}${ui.unit}</span>`;
+  } else if(currentCategory==="electronics"&&item.official){
+    tags+=`<span class="tag tag-official">공식판매처</span>`;
   }
   tags+=item.shipping==="free"?`<span class="tag tag-free">무료배송</span>`:`<span class="tag tag-paid">배송비 있음</span>`;
-  if(isLowest) tags+=`<span class="tag tag-model">최저가</span>`;
+  if(isLowest) tags+=`<span class="tag tag-low">최저가</span>`;
 
+  const card=document.createElement("div");
+  card.className="product-card"+(isLowest?" is-lowest":"");
   card.innerHTML=`
     ${isLowest?'<div class="lowest-tag">🏆 최저가</div>':""}
     ${item.image
@@ -586,7 +659,7 @@ function openZzim(){
   const content=document.getElementById("zzimContent");
   if(zzimList.length===0){ content.innerHTML=`<div class="empty-state"><div class="icon">🤍</div><p>찜한 상품이 없어요</p></div>`; return; }
   content.innerHTML="";
-  const gMin=Math.min(...zzimList.map(i=>Number(i.lprice)).filter(Boolean));
+  const gMin=zzimList.length?Math.min(...zzimList.map(i=>Number(i.lprice)).filter(Boolean)):0;
   zzimList.forEach(item=>content.appendChild(makeCard(item,gMin)));
 }
 function closeZzim(){ document.getElementById("zzimPanel").classList.remove("open"); }
