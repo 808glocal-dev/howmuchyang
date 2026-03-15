@@ -1,13 +1,21 @@
 const https = require("https");
 
+const CLIENT_ID = process.env.NAVER_CLIENT_ID;
+const CLIENT_SECRET = process.env.NAVER_CLIENT_SECRET;
+const COUPANG_AF_ID = process.env.COUPANG_AF_ID || "";
+
+// 쿠팡 추적 링크 생성
+function makeCoupangLink(query) {
+  if (!COUPANG_AF_ID) return `https://www.coupang.com/np/search?q=${encodeURIComponent(query)}`;
+  return `https://link.coupang.com/a/${COUPANG_AF_ID}?q=${encodeURIComponent(query)}`;
+}
+
 exports.handler = async function(event) {
   const query = event.queryStringParameters && event.queryStringParameters.query;
   const sort = event.queryStringParameters && event.queryStringParameters.sort || "sim";
 
   if (!query) return { statusCode: 400, body: JSON.stringify({ error: "query 없음" }) };
 
-  const CLIENT_ID = "GeceAEAtcWCxDPXj0vTL";
-  const CLIENT_SECRET = "fyEl26uZY_";
   const validSort = ["sim","date","asc","dsc"].includes(sort) ? sort : "sim";
 
   const fetchPage = (startNum) => new Promise((resolve) => {
@@ -36,10 +44,12 @@ exports.handler = async function(event) {
   try {
     const [page1, page2] = await Promise.all([fetchPage(1), fetchPage(31)]);
     const items = [...(page1.items || []), ...(page2.items || [])];
+    const coupangLink = makeCoupangLink(query);
+
     return {
       statusCode: 200,
       headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
-      body: JSON.stringify({ items, total: page1.total || 0 })
+      body: JSON.stringify({ items, total: page1.total || 0, coupangLink })
     };
   } catch(e) {
     return {
