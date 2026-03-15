@@ -127,7 +127,7 @@
   <div class="error-box" id="errorBox"></div>
 
   <!-- 기부 배너 -->
-  <div class="donate-banner" id="donateBanner">
+  <div class="donate-banner" id="donateBanner" style="display:block">
     <p>🐱 <strong>얼마냥은 유기묘를 돕고 있어요</strong><br/>이 링크로 구매하면 수익 일부가 유기묘 보호단체에 기부돼요. 쇼핑하면서 고양이도 구해요 🧡</p>
   </div>
   <div class="ai-section" id="aiSection" style="display:none">
@@ -206,7 +206,10 @@ const PRICE_FLOOR = {
 };
 
 // 증정/사은품 제외 키워드
-const GIFT_KW = ["증정","사은품","사은","랜덤발송","랜덤 발송","선물포장","리본포장","쇼핑백","이벤트상품","증정품","경품","공짜","무료증정","샘플","체험단","체험상품","후기약속","무료체험","시식","시음","테스터","tester","sample","이벤트참여","당첨","리뷰어","서포터즈","모니터링","슬로우식기","뷔만","비만","10원","20원","50원","100원","서플","trial","무료배송+체험","회원체험","체험권","이벤트용","행사용","나눔","증정이벤트"];
+const GIFT_KW = ["증정","사은품","사은","랜덤발송","랜덤 발송","선물포장","리본포장","쇼핑백","이벤트상품","증정품","경품","공짜","무료증정",
+  "샘플","체험단","체험상품","후기약속","무료체험","시식","시음","테스터","tester","sample","이벤트참여","당첨","리뷰어","서포터즈","모니터링",
+  "슬로우식기","뷔만","비만","서플","trial","무료배송+체험","회원체험","체험권","이벤트용","행사용","나눔","증정이벤트",
+  "마마캣","체험비용","후기작성","리뷰작성","포인트지급","무료발송","체험품","신제품체험","모니터요원","체험가"];
 // 악세사리 제외 키워드
 const ACCESSORY_KW = ["케이스","스티커","파우치","커버","보호필름","강화유리","거치대","스킨","필름","액세서리","악세사리","스트랩","고리","클립","충전독","도크","스탠드","인형","피규어","실리콘","범퍼","홀더","크래들","지갑","카드","자석","맥세이프","링","그립"];
 // 불용어
@@ -242,7 +245,12 @@ function smartFilter(items, query, category) {
   // 1단계: 체험/샘플/증정 무조건 제거 (완화 없음)
   const noSample = items.filter(item => {
     const title = strip(item.title).toLowerCase();
+    const price = Number(item.lprice);
+    // GIFT_KW 키워드 포함 제거
     if (GIFT_KW.some(k => title.includes(k))) return false;
+    // 비정상 저가 제거 (식품 500원 이하, 전체 100원 이하)
+    if (price <= 100) return false;
+    if (category === "food" && price < 500) return false;
     return true;
   });
 
@@ -370,7 +378,7 @@ async function doSearch() {
     })).map(i=>({...i, unitInfo:calcUnit(i), score:calcScore(i,query,"coupang")}));
 
     // 기본: 인기순 (API 순서 = 관련도+판매량 기반)
-    allItems = [...naverRaw, ...coupangRaw];
+    allItems = [...coupangRaw, ...naverRaw];
     currentFilter = "popular";
 
     buildFilterTabs();
@@ -436,7 +444,6 @@ function renderAll() {
   const prices = allItems.map(i=>Number(i.lprice)).filter(Boolean);
   const globalMin = Math.min(...prices);
 
-  document.getElementById("donateBanner").style.display = "block";
   document.getElementById("resultCountNum").textContent = allItems.length;
   document.getElementById("lowestBadge").textContent = "최저 "+fmt(globalMin)+"원";
   document.getElementById("resultMeta").style.display = "flex";
@@ -558,11 +565,10 @@ function getFiltered(filter) {
   if (filter === "naver") return [...naverRaw];
   if (filter === "coupang") return [...coupangRaw];
 
-  let items = [...naverRaw, ...coupangRaw];
+  let items = [...coupangRaw, ...naverRaw];
 
   if (filter === "popular") {
-    // 네이버 인기순(API 순서) + 쿠팡 분리
-    return [...naverRaw, ...coupangRaw];
+    return [...coupangRaw, ...naverRaw];
   }
   if (filter === "price") {
     if (priceOrder === "asc") return items.sort((a,b)=>Number(a.lprice)-Number(b.lprice));
