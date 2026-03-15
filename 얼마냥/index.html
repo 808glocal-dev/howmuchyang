@@ -85,6 +85,8 @@
     .product-actions{display:flex;gap:6px;}
     .btn-buy{background:linear-gradient(135deg,var(--primary),var(--secondary));color:white;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
     .btn-buy.gray{background:#f5f5f5;color:var(--sub);border:0.5px solid var(--border);}
+    .btn-share{border:none;border-radius:8px;padding:6px 10px;font-size:14px;cursor:pointer;font-family:inherit;background:#f5f5f5;transition:all 0.2s;}
+    .btn-share:active{transform:scale(0.95);}
     .btn-zzim{border:none;border-radius:8px;padding:6px 10px;font-size:14px;cursor:pointer;font-family:inherit;background:#fff0f0;transition:all 0.2s;}
     .btn-zzim.on{background:var(--primary);}
     .load-more-btn{width:100%;padding:12px;background:white;border:1.5px solid var(--border);border-radius:12px;font-size:13px;font-weight:700;color:var(--sub);cursor:pointer;font-family:inherit;margin-top:8px;display:none;}
@@ -923,6 +925,21 @@ function makeCard(item, globalMin) {
     e.stopPropagation();
     const url=item.link||item.productLink;
     if(url) window.open(url,"_blank");
+  });
+
+  card.querySelector(".btn-share").addEventListener("click",e=>{
+    e.stopPropagation();
+    const title = strip(item.title).substring(0,30);
+    const price = fmt(Number(item.lprice));
+    const url = item.link||item.productLink||"";
+    const shareText = `${title} - ${price}원
+최저가는 얼마냥에서!
+https://howmuchyang.netlify.app`;
+    if (navigator.share) {
+      navigator.share({ title: title, text: shareText, url: "https://howmuchyang.netlify.app" });
+    } else {
+      navigator.clipboard.writeText(shareText).then(()=>showToast("링크 복사됐어요! 🐱"));
+    }
   });
 
   card.addEventListener("click",()=>{ const url=item.link||item.productLink; if(url) window.open(url,"_blank"); });
