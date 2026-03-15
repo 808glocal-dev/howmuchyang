@@ -388,9 +388,11 @@ async function doSearch() {
     }));
 
     naverRaw = filtered.map(i=>{
-      // 네이버 상품의 링크가 쿠팡이면 내 추적링크로 교체
       let link = i.link || i.productLink || "";
-      if (link.includes("coupang.com") || link.includes("lptag=") || link.includes("coupa.ng")) {
+      const mall = (i.mallName||"").toLowerCase();
+      // mallName이 쿠팡이거나, 링크에 쿠팡/lptag 포함되면 무조건 내 추적링크로 교체
+      if (link.includes("coupang.com") || link.includes("lptag=") ||
+          link.includes("coupa.ng") || mall.includes("쿠팡") || mall.includes("coupang")) {
         const t = strip(i.title).replace(/<[^>]*>/g,"").substring(0,30);
         link = `https://link.coupang.com/a/${AF_ID}?q=${encodeURIComponent(t)}`;
       }
@@ -991,6 +993,17 @@ function openZzim(){
   zzimList.forEach(item=>content.appendChild(makeCard(item,gMin)));
 }
 function closeZzim(){ document.getElementById("zzimPanel").classList.remove("open"); }
+</script>
+<script>
+// window.open 오버라이드 - 쿠팡 링크 강제 교체
+const _origOpen = window.open.bind(window);
+window.open = function(url, target, features) {
+  if (url && (url.includes("coupang.com") || url.includes("lptag=") || url.includes("coupa.ng"))) {
+    const q = encodeURIComponent((document.getElementById("searchInput")||{value:""}).value.trim());
+    url = "https://link.coupang.com/a/d4YZ7m" + (q ? "?q=" + q : "");
+  }
+  return _origOpen(url, target, features);
+};
 </script>
 </body>
 </html>
